@@ -7,6 +7,7 @@
     "start": "nodemon"
   },
   "dependencies": {
+    "shared": "link:../shared",
     "express": "^4.17.1"
   },
   "devDependencies": {

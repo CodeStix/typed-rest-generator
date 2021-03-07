@@ -1,7 +1,9 @@
 import React from "react";
+import { User } from "shared";
 
 function App() {
-  return <p>this is a test</p>;
+    let a: User;
+    return <p>this is a test</p>;
 }
 
 export default App;
