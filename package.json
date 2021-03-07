@@ -1,0 +1,17 @@
+{
+  "name": "typed-rest-generator",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "license": "MIT",
+  "scripts": {
+    "run": "ts-node src/index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "ts-node": "^9.1.1",
+    "typescript": "^4.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^14.14.32"
+  }
+}
