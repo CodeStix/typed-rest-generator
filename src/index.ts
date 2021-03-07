@@ -1,5 +1,6 @@
 import ts from "typescript";
 import fs from "fs";
+import { decapitalize, splitCapitalized } from "./helpers";
 
 console.log(process.argv);
 
@@ -33,31 +34,6 @@ type EndPoint = {
 };
 
 type ApiType = "req" | "res" | "query" | "params";
-
-function decapitalize(str: string) {
-    return str[0].toLowerCase() + str.substring(1);
-}
-
-function isUpperCase(str: string, at: number) {
-    let c = str.charCodeAt(at);
-    return c >= 65 && c <= 90;
-}
-
-// UserPost -> ["User","Post"]
-// UserPostSettingsAAAAaaa -> ["User", "Post", "Settings", "AAAAaaa"]
-function splitCapitalized(str: string) {
-    let parts: string[] = [];
-    let current = "";
-    for (let i = 0; i < str.length; i++) {
-        if (isUpperCase(str, i) && !isUpperCase(str, i - 1) && i > 0) {
-            parts.push(current);
-            current = "";
-        }
-        current += str[i];
-    }
-    if (current.length > 0) parts.push(current);
-    return parts;
-}
 
 function findRouteTypesInFile(fileName: string, output: Methods) {
     let file = ts.createSourceFile(
