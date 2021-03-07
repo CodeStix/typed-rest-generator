@@ -1,6 +1,6 @@
 declare module "shared" {}
 
-export type GetPost = {
+export type GetPostRequest = {
     id: string;
 };
 
@@ -21,13 +21,11 @@ export interface User {
     lastName: string;
 }
 
-export type GetUser = {
+export type GetUserRequest = {
     id: number;
 };
 
-// type GetUserQuery = {};
-
-export type GetUserParams = {
+export type GetUserRequestParams = {
     path: string;
 };
 
@@ -35,10 +33,10 @@ export type GetUserResponse = {
     user: User;
 };
 
-export type GetUserQuery = {
+export type GetUserRequestQuery = {
     queryValue: string;
 };
 
-export type GetUserParams = {
+export type GetUserRequestParams = {
     paramValue: string;
 };

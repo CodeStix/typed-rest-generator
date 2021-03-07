@@ -14,17 +14,26 @@ function findRouteTypesInFile(fileName: string) {
 }
 
 function findRouteTypes(statements: ts.NodeArray<ts.Statement>) {
-    statements.forEach((statement) => {
+    for (let i = 0; i < statements.length; i++) {
+        let statement = statements[i];
         if (
             ts.isTypeAliasDeclaration(statement) ||
             ts.isInterfaceDeclaration(statement) ||
             ts.isClassDeclaration(statement)
         ) {
-            console.log(statement.name?.text);
+            let name = statement.name!.text;
+            let m;
+            if (
+                (m = name.match(
+                    /^(Get|Post|Put|Patch|Delete|Head|Options)([a-zA-Z]+)(Response|Request|RequestQuery|RequestParams)$/i
+                ))
+            ) {
+                let [, method, path, type] = m;
+                console.log(`method=${method} path=${path} type=${type}`);
+            }
         } else if (ts.isModuleDeclaration(statement) && statement.body) {
             findRouteTypes((statement.body as ts.ModuleBlock).statements);
         }
-    });
+    }
 }
-
-findRouteTypesInFile("example/shared/routes.d.ts");
+findRouteTypesInFile("example/shared/index.d.ts");
