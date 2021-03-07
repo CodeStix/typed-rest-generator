@@ -1,58 +1,36 @@
-import express from "express";
-import core from "express-serve-static-core";
+import core, {
+  ParamsDictionary,
+  RequestHandlerParams,
+  RequestHandler,
+} from "express-serve-static-core";
+import { ParsedQs } from "qs";
+import * as api from "../shared/routes";
 
-type GetPost = {
-  id: string;
-};
-
-interface Post {
-  id: string;
-  title: string;
-  content: string;
-}
-
-interface GetPostResponse {
-  post: Post;
-}
-
-interface User {
-  id: number;
-  email: string;
-  firstName: string;
-  lastName: string;
-}
-
-type GetUser = {
-  id: number;
-};
-
-// type GetUserQuery = {};
-
-type GetUserParams = {
-  path: string;
-};
-
-type GetUserResponse = {
-  user: User;
-};
-
-////////////////
-
-type Endpoint<Req, Res, Params = any> = {
+type Endpoint<Req, Res, Params = never, Query = never> = {
   req: Req;
   res: Res;
   params: Params;
+  query: Query;
+};
+
+type TypedParsedQs<T> = {
+  [Key in keyof T]: undefined | string | string[] | ParsedQs<T[Key]>;
 };
 
 export type Endpoints = {
   get: {
-    "/postget": Endpoint<GetPost, GetPostResponse>;
+    "/postget": Endpoint<api.GetPost, api.GetPostResponse>;
   };
   post: {
-    "/user": Endpoint<GetUser, GetUserResponse>;
+    "/user": Endpoint<
+      api.GetUser,
+      api.GetUserResponse,
+      api.GetUserParams,
+      api.GetUserQuery
+    >;
   };
   put: {
-    "/post": Endpoint<GetPost, GetPostResponse>;
+    "/post": Endpoint<api.GetPost, api.GetPostResponse>;
   };
   delete: {};
   patch: {};
@@ -90,18 +68,16 @@ declare module "express-serve-static-core" {
       // tslint:disable-next-line no-unnecessary-generics (This generic is meant to be passed explicitly.)
       ...handlers: Array<
         RequestHandler<
-          P,
+          Endpoints[Method][Path]["params"],
           Endpoints[Method][Path]["res"],
           Endpoints[Method][Path]["req"],
-          ReqQuery,
+          Endpoints[Method][Path]["query"],
           Locals
         >
       >
     ): T;
     <
       P = ParamsDictionary,
-      ResBody = any,
-      ReqBody = any,
       ReqQuery = ParsedQs,
       Locals extends Record<string, any> = Record<string, any>,
       Path extends MethodPath<Method>
@@ -110,10 +86,10 @@ declare module "express-serve-static-core" {
       // tslint:disable-next-line no-unnecessary-generics (This generic is meant to be passed explicitly.)
       ...handlers: Array<
         RequestHandlerParams<
-          P,
+          Endpoints[Method][Path]["params"],
           Endpoints[Method][Path]["res"],
           Endpoints[Method][Path]["req"],
-          ReqQuery,
+          Endpoints[Method][Path]["query"],
           Locals
         >
       >
