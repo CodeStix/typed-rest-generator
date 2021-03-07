@@ -71,7 +71,7 @@ declare module "express-serve-static-core" {
                     Endpoints[Method][Path]["params"],
                     Endpoints[Method][Path]["res"],
                     Endpoints[Method][Path]["req"],
-                    Endpoints[Method][Path]["query"],
+                    TypedParsedQs<Endpoints[Method][Path]["query"]>,
                     Locals
                 >
             >
@@ -89,7 +89,7 @@ declare module "express-serve-static-core" {
                     Endpoints[Method][Path]["params"],
                     Endpoints[Method][Path]["res"],
                     Endpoints[Method][Path]["req"],
-                    Endpoints[Method][Path]["query"],
+                    TypedParsedQs<Endpoints[Method][Path]["query"]>,
                     Locals
                 >
             >
