@@ -6,10 +6,10 @@ console.log(process.argv);
 type Method = "get" | "post" | "put" | "delete" | "patch" | "options" | "head";
 
 type Methods = {
-    [M in Method]?: Paths;
+    [M in Method]?: PathTypes;
 };
 
-type Paths = {
+type PathTypes = {
     [path: string]: EndPoint;
 };
 
@@ -34,12 +34,30 @@ type EndPoint = {
 
 type ApiType = "req" | "res" | "query" | "params";
 
-// interface EndpointStatement {
-//     apiType: ApiType;
-//     type: ts.Statement;
-//     method: Method;
-//     path: string;
-// }
+function decapitalize(str: string) {
+    return str[0].toLowerCase() + str.substring(1);
+}
+
+function isUpperCase(str: string, at: number) {
+    let c = str.charCodeAt(at);
+    return c >= 65 && c <= 90;
+}
+
+// UserPost -> ["User","Post"]
+// UserPostSettingsAAAAaaa -> ["User", "Post", "Settings", "AAAAaaa"]
+function splitCapitalized(str: string) {
+    let parts: string[] = [];
+    let current = "";
+    for (let i = 0; i < str.length; i++) {
+        if (isUpperCase(str, i) && !isUpperCase(str, i - 1) && i > 0) {
+            parts.push(current);
+            current = "";
+        }
+        current += str[i];
+    }
+    if (current.length > 0) parts.push(current);
+    return parts;
+}
 
 function findRouteTypesInFile(fileName: string, output: Methods) {
     let file = ts.createSourceFile(
@@ -89,18 +107,17 @@ function findRouteTypes(
                     /^(Get|Post|Put|Patch|Delete|Head|Options)([a-zA-Z]+)(Response|Request|RequestQuery|RequestParams)$/
                 ))
             ) {
-                let method = m[1] as Method;
-                let path = m[2].toLowerCase();
+                let method = m[1].toLowerCase() as Method;
+                let pathType = m[2];
                 let apiType = apiTypeNameToApiTypePropertyName(m[3]);
 
                 output[method] = {
                     ...output[method],
-                    [path]: {
-                        ...output[method]?.[path],
+                    [pathType]: {
+                        ...output[method]?.[pathType],
                         [apiType]: statement,
                     },
                 };
-                console.log(`method=${method} path=${path} type=${apiType}`);
             }
         } else if (ts.isModuleDeclaration(statement) && statement.body) {
             findRouteTypes(
@@ -111,10 +128,6 @@ function findRouteTypes(
     }
 }
 
-// function groupBy<T, O>(x: Array<T>, f: (f: T) => keyof O): O {
-//     return x.reduce((a, b) => ((a[f(b)] ||= []).push(b), a), {} as any);
-// }
-
 function main() {
     let methods: Methods = {};
     findRouteTypesInFile("example/shared/index.d.ts", methods);
@@ -122,29 +135,41 @@ function main() {
 
     let typeOutputs: string[] = [];
 
-    output.write(`export type Endpoints = {`);
+    function typeNameToPath(typeName: string) {
+        return (
+            "/" +
+            splitCapitalized(typeName)
+                .map((e) => decapitalize(e))
+                .join("/")
+        );
+    }
+
+    output.write(`export type Endpoints = {\n`);
 
     Object.keys(methods).forEach((method) => {
-        let paths = methods[method as Method]!;
+        let pathTypes = methods[method as Method]!;
 
-        output.write(`\t ${method}: {\n`);
+        output.write(`\t${method}: {\n`);
 
-        Object.keys(paths).forEach((path) => {
-            let types = paths[path];
+        Object.keys(pathTypes).forEach((pathTypeName) => {
+            let endpoint = pathTypes[pathTypeName];
 
-            Object.keys(types).forEach((apiType) => {
-                let type = types[apiType as ApiType];
+            Object.keys(endpoint).forEach((apiType) => {
+                let type = endpoint[apiType as ApiType];
                 if (!type) return;
 
                 typeOutputs.push(type.getFullText() + "\n");
             });
 
+            let path = typeNameToPath(pathTypeName);
+            console.log(`${pathTypeName} --> ${path}`);
+
             output.write(
-                `\t\t"/${path}": Endpoint<${
-                    types.req?.name?.text ?? "unknown"
-                }, ${types.res?.name?.text ?? "unknown"}, ${
-                    types.params?.name?.text ?? "unknown"
-                }, ${types.query?.name?.text ?? "unknown"}>;\n`
+                `\t\t"${path}": Endpoint<${
+                    endpoint.req?.name?.text ?? "unknown"
+                }, ${endpoint.res?.name?.text ?? "unknown"}, ${
+                    endpoint.params?.name?.text ?? "unknown"
+                }, ${endpoint.query?.name?.text ?? "unknown"}>;\n`
             );
         });
 

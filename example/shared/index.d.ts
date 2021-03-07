@@ -40,3 +40,8 @@ export type GetUserRequestQuery = {
 export type GetUserRequestParams = {
     paramValue: string;
 };
+
+export interface GetUserPostRequest {
+    id: number;
+    text: string;
+}
