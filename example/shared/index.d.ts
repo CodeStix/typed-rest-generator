@@ -1,13 +1,19 @@
-declare module "shared" {}
+import { Exporttest } from "./second";
 
 export type GetPostRequest = {
     id: string;
 };
 
+interface Yikes {
+    test: string;
+    exports: Exporttest;
+}
+
 export interface Post {
     id: string;
     title: string;
     content: string;
+    yikes: Yikes;
 }
 
 export interface GetPostResponse {

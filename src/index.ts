@@ -1,8 +1,7 @@
 import ts from "typescript";
 import fs from "fs";
 import { decapitalize, splitCapitalized } from "./helpers";
-
-console.log(process.argv);
+import { join, resolve } from "path";
 
 type Method = "get" | "post" | "put" | "delete" | "patch" | "options" | "head";
 
@@ -104,12 +103,64 @@ function findRouteTypes(
     }
 }
 
+function mergeArrays<T>(...arr: T[][]): T[] {
+    let a: T[] = [];
+    arr.forEach((e) => a.push(...e));
+    return a;
+}
+
+function resolveTypeReferences(
+    node: ts.Node,
+    typeChecker: ts.TypeChecker,
+    output: Set<ts.Symbol>
+) {
+    if (ts.isInterfaceDeclaration(node) || ts.isTypeLiteralNode(node)) {
+        if (ts.isInterfaceDeclaration(node)) {
+            let interfaceType = typeChecker.getTypeAtLocation(node).symbol;
+            output.add(interfaceType);
+        }
+
+        node.members.forEach((member) => {
+            if (
+                ts.isPropertySignature(member) &&
+                member.type &&
+                ts.isTypeReferenceNode(member.type)
+            ) {
+                let name = member.type.typeName.getText();
+                let symbol = typeChecker
+                    .getTypeAtLocation(member.type)
+                    .getSymbol();
+                if (!symbol) throw new Error(`Type ${name} was not found`);
+                if (symbol.declarations.length > 1)
+                    throw new Error(`Multiple declarations for ${name}`);
+
+                console.log("symbol", name);
+                if (!output.has(symbol)) {
+                    console.log(`looking at ${name}`);
+                    resolveTypeReferences(
+                        symbol.declarations[0],
+                        typeChecker,
+                        output
+                    );
+                } else {
+                    console.log(`already looked at ${name}`);
+                }
+            }
+        });
+    } else if (ts.isTypeAliasDeclaration(node)) {
+        let aliasType = typeChecker.getTypeAtLocation(node).aliasSymbol!;
+        output.add(aliasType);
+        resolveTypeReferences(node.type, typeChecker, output);
+    }
+}
+
 function main() {
-    let methods: Methods = {};
-    findRouteTypesInFile("example/shared/index.d.ts", methods);
+    let path = process.argv.slice(2).join(" ") || process.cwd();
+    console.log("path", path);
+
     let output = fs.createWriteStream("output.d.ts");
 
-    let typeOutputs: string[] = [];
+    // let typeOutputs: string[] = [];
 
     function typeNameToPath(typeName: string) {
         return (
@@ -119,6 +170,33 @@ function main() {
                 .join("/")
         );
     }
+
+    let configFileName = ts.findConfigFile(
+        path,
+        ts.sys.fileExists,
+        "tsconfig.json"
+    );
+    if (!configFileName) {
+        throw new Error("tsconfig.json could not be found");
+    }
+    let configFile = ts.readConfigFile(configFileName, ts.sys.readFile);
+    let config = ts.parseJsonConfigFileContent(configFile.config, ts.sys, "./")
+        .options;
+
+    let program = ts.createProgram([path], config);
+    // let source = program.getSourceFile(path);
+    let referencedTypes = new Set<ts.Symbol>();
+    // source!.statements.forEach((statement) => {
+    //     resolveTypeReferences(
+    //         statement,
+    //         program.getTypeChecker(),
+    //         referencedTypes
+    //     );
+    // });
+
+    let methods: Methods = {};
+    findRouteTypes(program.getSourceFile(path)!.statements, methods);
+    // findRouteTypesInFile("example/shared/index.d.ts", methods);
 
     output.write(`export type Endpoints = {\n`);
 
@@ -134,7 +212,13 @@ function main() {
                 let type = endpoint[apiType as ApiType];
                 if (!type) return;
 
-                typeOutputs.push(type.getFullText() + "\n");
+                resolveTypeReferences(
+                    type,
+                    program.getTypeChecker(),
+                    referencedTypes
+                );
+
+                // typeOutputs.push(type.getFullText() + "\n");
             });
 
             let path = typeNameToPath(pathTypeName);
@@ -154,7 +238,10 @@ function main() {
 
     output.write(`}\n\n`);
 
-    typeOutputs.forEach((t) => output.write(t));
+    referencedTypes.forEach((e) => {
+        console.log("Referenced", e.name);
+        output.write(e.declarations[0].getFullText() + "\n");
+    });
 
     output.close();
 }
