@@ -1,5 +1,4 @@
 import { Post, User } from "@prisma/client";
-import { Test } from "shared";
 
 export type GetPostRequest = {
     id: string;
@@ -9,7 +8,6 @@ interface Yikes {
     name: string;
     post: Post;
     yikers: Yikes2;
-    test: Test;
 }
 
 type Yikes2 = {

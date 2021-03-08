@@ -1,7 +1,8 @@
 import ts from "typescript";
 import fs from "fs";
+import path from "path";
 import { decapitalize, splitCapitalized } from "./helpers";
-import { join, resolve } from "path";
+import semver from "semver";
 
 type Method = "get" | "post" | "put" | "delete" | "patch" | "options" | "head";
 
@@ -139,23 +140,49 @@ function resolveTypeReferences(
     }
 }
 
+function typeNameToPath(typeName: string) {
+    return (
+        "/" +
+        splitCapitalized(typeName)
+            .map((e) => decapitalize(e))
+            .join("/")
+    );
+}
+
 function main() {
-    let path = process.argv.slice(2).join(" ") || process.cwd();
-    console.log("path", path);
-
-    let output = fs.createWriteStream("output.d.ts");
-
-    function typeNameToPath(typeName: string) {
-        return (
-            "/" +
-            splitCapitalized(typeName)
-                .map((e) => decapitalize(e))
-                .join("/")
+    let routesFileName = process.argv[2]; // .slice(2).join(" ")
+    if (!routesFileName) {
+        throw new Error(
+            "Invalid usage, please specify the files containing your routes"
         );
     }
+    console.log("path", routesFileName);
+
+    let destinationPackagePath = "example/shared";
+    fs.mkdirSync(destinationPackagePath, { recursive: true });
+    let packageJsonPath = path.join(destinationPackagePath, "package.json");
+    let packageJson;
+    if (fs.existsSync(packageJsonPath)) {
+        packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+        let v = semver.parse(packageJson.version)!;
+        v.patch += 1;
+        console.log("New version", v.format());
+        packageJson.version = v.format();
+    } else {
+        packageJson = {
+            name: "shared",
+            version: "1.0.0",
+            main: "index.js",
+            types: "index.d.ts",
+            license: "MIT",
+        };
+    }
+    fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+    let typingsPath = path.join(destinationPackagePath, "index.d.ts");
+    let output = fs.createWriteStream(typingsPath);
 
     let configFileName = ts.findConfigFile(
-        path,
+        routesFileName,
         ts.sys.fileExists,
         "tsconfig.json"
     );
@@ -166,11 +193,14 @@ function main() {
     let config = ts.parseJsonConfigFileContent(configFile.config, ts.sys, "./")
         .options;
 
-    let program = ts.createProgram([path], config);
+    let program = ts.createProgram([routesFileName], config);
 
-    let referencedNodes = new Set<ts.Node>();
+    let referencedTypes = new Set<ts.Node>();
     let routeTypes: Methods = {};
-    findRouteTypes(program.getSourceFile(path)!.statements, routeTypes);
+    findRouteTypes(
+        program.getSourceFile(routesFileName)!.statements,
+        routeTypes
+    );
 
     output.write(`export type Endpoints = {\n`);
 
@@ -189,7 +219,7 @@ function main() {
                 resolveTypeReferences(
                     node,
                     program.getTypeChecker(),
-                    referencedNodes
+                    referencedTypes
                 );
             });
 
@@ -210,8 +240,8 @@ function main() {
 
     output.write(`}\n\n`);
 
-    referencedNodes.forEach((e) => {
-        let t = e.getFullText();
+    referencedTypes.forEach((e) => {
+        let t = e.getText();
         output.write(t + "\n");
     });
 
