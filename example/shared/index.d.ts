@@ -1,1 +1,7 @@
-export interface Test {}
+export interface Test {
+    yikes: Yikers;
+}
+
+interface Yikers {
+    name: string;
+}

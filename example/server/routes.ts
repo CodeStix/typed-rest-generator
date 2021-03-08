@@ -1,14 +1,28 @@
 import { Post, User } from "@prisma/client";
+import { Test } from "shared";
 
 export type GetPostRequest = {
     id: string;
 };
 
-export interface GetPostResponse {
+interface Yikes {
+    name: string;
     post: Post;
+    yikers: Yikes2;
+    test: Test;
+}
+
+type Yikes2 = {
+    name: string;
+};
+
+export interface GetPostResponse {
+    yikes: Yikes;
+    post: Date;
 }
 
 export type GetUserRequest = {
+    yikes: Yikes | Yikes2;
     id: number;
 };
 

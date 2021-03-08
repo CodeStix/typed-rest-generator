@@ -92,15 +92,21 @@ function findRouteTypes(
     }
 }
 
+const SKIP_TYPES = ["Date", "BigInt", "Decimal"];
+
 function resolveTypeReferences(
     node: ts.Node,
     typeChecker: ts.TypeChecker,
-    output: Set<ts.Symbol>
+    output: Set<ts.Node>
 ) {
-    if (ts.isInterfaceDeclaration(node) || ts.isTypeLiteralNode(node)) {
+    if (ts.isVariableDeclaration(node)) {
+        // Add the variable statement (parent.parent), which contains modifiers
+        output.add(node.parent.parent);
+    } else if (ts.isInterfaceDeclaration(node) || ts.isTypeLiteralNode(node)) {
+        // Type literal was already added below
         if (ts.isInterfaceDeclaration(node)) {
-            let interfaceType = typeChecker.getTypeAtLocation(node).symbol;
-            output.add(interfaceType);
+            if (output.has(node)) return;
+            output.add(node);
         }
         node.members.forEach((member) => {
             if (ts.isPropertySignature(member) && member.type) {
@@ -108,24 +114,28 @@ function resolveTypeReferences(
             }
         });
     } else if (ts.isTypeReferenceNode(node)) {
+        // Find where type is defined
         let name = node.typeName.getText();
-        let symbol = typeChecker.getTypeAtLocation(node).getSymbol();
+        if (SKIP_TYPES.includes(name)) return;
+        let type = typeChecker.getTypeFromTypeNode(node);
+        let symbol = type.aliasSymbol ?? type.symbol;
         if (!symbol) throw new Error(`Type ${name} was not found`);
-        if (symbol.declarations.length > 1)
-            throw new Error(`Multiple declarations for ${name}`);
-        if (!output.has(symbol)) {
-            resolveTypeReferences(symbol.declarations[0], typeChecker, output);
-        } else {
-            console.log(`Already looked at ${name}`);
-        }
+        // if (symbol.declarations.length > 1)
+        //     console.warn(`Multiple declarations for type '${name}'`);
+        symbol.declarations.forEach((decl) =>
+            resolveTypeReferences(decl, typeChecker, output)
+        );
     } else if (ts.isTypeAliasDeclaration(node)) {
-        let aliasType = typeChecker.getTypeAtLocation(node).aliasSymbol!;
-        output.add(aliasType);
-        resolveTypeReferences(node.type, typeChecker, output);
+        if (!output.has(node)) {
+            output.add(node);
+            resolveTypeReferences(node.type, typeChecker, output);
+        }
     } else if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node)) {
         node.types.forEach((type) =>
             resolveTypeReferences(type, typeChecker, output)
         );
+    } else {
+        // console.warn(`Unsupported node ${ts.SyntaxKind[node.kind]}`);
     }
 }
 
@@ -158,7 +168,7 @@ function main() {
 
     let program = ts.createProgram([path], config);
 
-    let referencedTypes = new Set<ts.Symbol>();
+    let referencedNodes = new Set<ts.Node>();
     let routeTypes: Methods = {};
     findRouteTypes(program.getSourceFile(path)!.statements, routeTypes);
 
@@ -173,13 +183,13 @@ function main() {
             let endpoint = pathTypes[pathTypeName];
 
             Object.keys(endpoint).forEach((apiType) => {
-                let type = endpoint[apiType as ApiType];
-                if (!type) return;
+                let node = endpoint[apiType as ApiType];
+                if (!node) return;
 
                 resolveTypeReferences(
-                    type,
+                    node,
                     program.getTypeChecker(),
-                    referencedTypes
+                    referencedNodes
                 );
             });
 
@@ -200,9 +210,9 @@ function main() {
 
     output.write(`}\n\n`);
 
-    referencedTypes.forEach((e) => {
-        console.log("Referenced", e.name);
-        output.write(e.declarations[0].getFullText() + "\n");
+    referencedNodes.forEach((e) => {
+        let t = e.getFullText();
+        output.write(t + "\n");
     });
 
     output.close();

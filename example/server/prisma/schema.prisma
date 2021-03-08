@@ -10,11 +10,17 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum Gender {
+  male
+  female
+}
+
 model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   password  String
   birthDate DateTime
+  gender    Gender
   posts     Post[]
 }
 
