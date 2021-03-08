@@ -1,5 +1,5 @@
 import express, { RequestHandler, IRouterMatcher } from "express";
-import { User } from "shared";
+import { Post } from "@prisma/client";
 
 const app = express();
 app.get("/", (req, res, next) => {

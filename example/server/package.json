@@ -7,12 +7,14 @@
     "start": "nodemon"
   },
   "dependencies": {
-    "shared": "link:../shared",
-    "express": "^4.17.1"
+    "@prisma/client": "2.18.0",
+    "express": "^4.17.1",
+    "shared": "link:../shared"
   },
   "devDependencies": {
     "@types/express": "^4.17.11",
     "nodemon": "^2.0.7",
+    "prisma": "2.18.0",
     "ts-node": "^9.1.1",
     "typescript": "^4.2.3"
   }
