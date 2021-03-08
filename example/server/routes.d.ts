@@ -5,7 +5,7 @@ export type PostPostRequest = {
 };
 
 export interface PostPostResponse {
-    post: Date;
+    post: Post;
 }
 
 export interface PostUserRequest {

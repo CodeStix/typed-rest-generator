@@ -71,19 +71,30 @@ declare module "express-serve-static-core" {
     }
 }
 export type Endpoints = {
-	post: {
-		"/post": Endpoint<PostPostRequest, PostPostResponse, unknown, unknown>;
-		"/user": Endpoint<PostUserRequest, PostUserResponse, PostUserRequestParams, PostUserRequestQuery>;
-		"/user/post": Endpoint<PostUserPostRequest, unknown, unknown, unknown>;
-	},
-}
+    post: {
+        "/post": Endpoint<PostPostRequest, PostPostResponse, unknown, unknown>;
+        "/user": Endpoint<
+            PostUserRequest,
+            PostUserResponse,
+            PostUserRequestParams,
+            PostUserRequestQuery
+        >;
+        "/user/post": Endpoint<PostUserPostRequest, unknown, unknown, unknown>;
+    };
+};
 
 export type PostPostRequest = {
     id: string;
 };
 export interface PostPostResponse {
-    post: Date;
+    post: Post;
 }
+export type Post = {
+    id: string;
+    title: string;
+    content: string;
+    userId: number;
+};
 export interface PostUserRequest {
     id: number;
 }
@@ -91,17 +102,17 @@ export interface PostUserResponse {
     user: User;
 }
 export type User = {
-  id: number
-  email: string
-  password: string
-  birthDate: Date
-  gender: Gender
-}
-export const Gender: {
-  male: 'male',
-  female: 'female'
+    id: number;
+    email: string;
+    password: string;
+    birthDate: Date;
+    gender: Gender;
 };
-export type Gender = (typeof Gender)[keyof typeof Gender]
+export const Gender: {
+    male: "male";
+    female: "female";
+};
+export type Gender = typeof Gender[keyof typeof Gender];
 export interface PostUserRequestQuery {
     queryValue: string;
 }
@@ -111,4 +122,30 @@ export interface PostUserRequestParams {
 export interface PostUserPostRequest {
     id: number;
     text: string;
+}
+
+interface ClientSettings {
+    path?: string;
+    fetcher?: (url: string, method: string, body?: object) => Promise<any>;
+}
+
+class Client {
+    public readonly settings: ClientSettings;
+
+    constructor(settings?: ClientSettings);
+
+    fetch<Method extends keyof Endpoints, Path extends MethodPath<Method>>(
+        method: Method,
+        path: Path,
+        body?: Endpoints[Method][Path]["req"],
+        query?: Endpoints[Method][Path]["query"]
+    ): Promise<Endpoints[Method][Path]["res"]>;
+
+    async postPost(data: PostPostRequest): Promise<PostPostResponse>;
+
+    async postUser(
+        data: PostUserRequest & PostUserRequestQuery
+    ): Promise<PostUserResponse>;
+
+    async postUserPost(data: PostUserPostRequest): Promise<void>;
 }

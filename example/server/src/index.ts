@@ -1,13 +1,20 @@
 import express, { RequestHandler, IRouterMatcher } from "express";
 import { Post } from "@prisma/client";
-import { Endpoints, MethodPath } from "shared";
+import { Endpoints, MethodPath, Client } from "shared";
+
+let client = new Client();
+client.fetch("post", "/post", { id: "100" });
 
 const app = express();
 app.get("/user" as MethodPath<"get">, (req, res, next) => {
     res.end("hello world");
 });
 
-app.post("/", (req, res, next) => {});
+app.post("/post", (req, res, next) => {
+    res.json({
+        post: { content },
+    });
+});
 
 app.post("", function (req, res, next) {
     req.query.queryValue;

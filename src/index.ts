@@ -4,17 +4,24 @@ import path from "path";
 import { decapitalize, splitCapitalized } from "./helpers";
 import semver from "semver";
 
-type Method = "get" | "post" | "put" | "delete" | "patch" | "options" | "head";
+export type Method =
+    | "get"
+    | "post"
+    | "put"
+    | "delete"
+    | "patch"
+    | "options"
+    | "head";
 
-type Methods = {
+export type Methods = {
     [M in Method]?: PathTypes;
 };
 
-type PathTypes = {
+export type PathTypes = {
     [path: string]: EndPoint;
 };
 
-type EndPoint = {
+export type EndPoint = {
     req?:
         | ts.InterfaceDeclaration
         | ts.TypeAliasDeclaration
@@ -33,7 +40,7 @@ type EndPoint = {
         | ts.ClassDeclaration;
 };
 
-type ApiType = "req" | "res" | "query" | "params";
+export type ApiType = keyof EndPoint;
 
 function apiTypeNameToApiTypePropertyName(
     typeName: string
@@ -149,17 +156,8 @@ function typeNameToPath(typeName: string) {
     );
 }
 
-function main() {
-    let routesFileName = process.argv[2]; // .slice(2).join(" ")
-    if (!routesFileName) {
-        throw new Error(
-            "Invalid usage, please specify the files containing your routes"
-        );
-    }
-    console.log("path", routesFileName);
-
-    let destinationPackagePath = "example/shared";
-    fs.mkdirSync(destinationPackagePath, { recursive: true });
+function updatePackage(destinationPackagePath: string) {
+    // Create or update (increase version) package.json
     let packageJsonPath = path.join(destinationPackagePath, "package.json");
     let packageJson;
     if (fs.existsSync(packageJsonPath)) {
@@ -175,42 +173,68 @@ function main() {
             main: "index.js",
             types: "index.d.ts",
             license: "MIT",
+            dependencies: {
+                "@types/express-serve-static-core": "^4.17.18",
+                qs: "^6.9.6",
+            },
         };
     }
     fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
-    let typingsPath = path.join(destinationPackagePath, "index.d.ts");
-    let output = fs.createWriteStream(typingsPath);
 
-    let configFileName = ts.findConfigFile(
-        routesFileName,
-        ts.sys.fileExists,
-        "tsconfig.json"
-    );
-    if (!configFileName) {
-        throw new Error("tsconfig.json could not be found");
+    // Create .gitignore
+    let gitignorePath = path.join(destinationPackagePath, ".gitignore");
+    if (!fs.existsSync(gitignorePath)) {
+        fs.writeFileSync(gitignorePath, "/node_modules");
     }
-    let configFile = ts.readConfigFile(configFileName, ts.sys.readFile);
-    let config = ts.parseJsonConfigFileContent(configFile.config, ts.sys, "./")
-        .options;
+}
 
-    let program = ts.createProgram([routesFileName], config);
+function getDefaultTypes() {
+    let defaultTypesPath = path.join(__dirname, "types.d.ts");
+    return fs.readFileSync(defaultTypesPath, "utf8");
+}
+
+function generateIndex(output: fs.WriteStream) {
+    output.write(`
+interface ClientSettings {
+    path?: string;
+    fetcher?: (url: string, method: string, body?: object) => Promise<any>;
+}
+
+class Client {
+    public readonly settings: ClientSettings;
+
+    constructor(settings?: ClientSettings);
+
+    fetch<Method extends keyof Endpoints, Path extends MethodPath<Method>>(
+        method: Method,
+        path: Path,
+        body?: Endpoints[Method][Path]["req"],
+        query?: Endpoints[Method][Path]["query"]
+    ): Promise<Endpoints[Method][Path]["res"]>;
+}
+`);
+}
+
+function generatePackageContent(
+    program: ts.Program,
+    routeTypes: Methods,
+    typingsStream: fs.WriteStream,
+    codeStream: fs.WriteStream
+) {
+    // Copy default types
+    typingsStream.write(getDefaultTypes());
 
     let referencedTypes = new Set<ts.Node>();
-    let routeTypes: Methods = {};
-    findRouteTypes(
-        program.getSourceFile(routesFileName)!.statements,
-        routeTypes
-    );
+    let clientClassMethodTypings: string[] = [];
+    let clientClassMethodImplementations: string[] = [];
 
-    let defaultTypesPath = path.join(__dirname, "types.d.ts");
-    output.write(fs.readFileSync(defaultTypesPath, "utf8"));
-
-    output.write(`export type Endpoints = {\n`);
+    // Write Endpoints type
+    typingsStream.write(`export type Endpoints = {\n`);
 
     Object.keys(routeTypes).forEach((method) => {
         let pathTypes = routeTypes[method as Method]!;
 
-        output.write(`\t${method}: {\n`);
+        typingsStream.write(`\t${method}: {\n`);
 
         Object.keys(pathTypes).forEach((pathTypeName) => {
             let endpoint = pathTypes[pathTypeName];
@@ -229,26 +253,152 @@ function main() {
             let path = typeNameToPath(pathTypeName);
             console.log(`${pathTypeName} --> ${path}`);
 
-            output.write(
-                `\t\t"${path}": Endpoint<${
-                    endpoint.req?.name?.text ?? "unknown"
-                }, ${endpoint.res?.name?.text ?? "unknown"}, ${
-                    endpoint.params?.name?.text ?? "unknown"
-                }, ${endpoint.query?.name?.text ?? "unknown"}>;\n`
+            let reqType = endpoint.req?.name?.text;
+            let resType = endpoint.res?.name?.text;
+            let paramsType = endpoint.params?.name?.text;
+            let queryType = endpoint.query?.name?.text;
+
+            let paramDefs = [reqType, queryType].filter((e) => e);
+            clientClassMethodTypings.push(
+                `async ${method}${pathTypeName} (${
+                    paramDefs.length > 0 ? "data: " + paramDefs.join(" & ") : ""
+                }): Promise<${resType ?? "void"}>;`
+            );
+
+            clientClassMethodImplementations.push(
+                `async ${method}${pathTypeName} (data) { 
+                    return await this.fetch("${method}", "${path}", data);
+                }`
+            );
+
+            typingsStream.write(
+                `\t\t"${path}": Endpoint<${reqType ?? "unknown"}, ${
+                    resType ?? "unknown"
+                }, ${paramsType ?? "unknown"}, ${queryType ?? "unknown"}>;\n`
             );
         });
 
-        output.write(`\t},\n`);
+        typingsStream.write(`\t},\n`);
     });
 
-    output.write(`}\n\n`);
+    typingsStream.write(`}\n\n`);
 
+    // Copy all referenced types
     referencedTypes.forEach((e) => {
         let t = e.getText();
-        output.write(t + "\n");
+        typingsStream.write(t + "\n");
     });
 
+    // Create Client class typedefs
+    typingsStream.write(`
+interface ClientSettings {
+    path?: string;
+    fetcher?: (url: string, method: string, body?: object) => Promise<any>;
+}
+
+class Client {
+    public readonly settings: ClientSettings;
+
+    constructor(settings?: ClientSettings);
+
+    fetch<Method extends keyof Endpoints, Path extends MethodPath<Method>>(
+        method: Method,
+        path: Path,
+        body?: Endpoints[Method][Path]["req"],
+        query?: Endpoints[Method][Path]["query"]
+    ): Promise<Endpoints[Method][Path]["res"]>;
+
+    ${clientClassMethodTypings.join("\n\n")}
+}
+    `);
+
+    codeStream.write(`
+async function defaultFetcher(url, method, body) {
+    let res = await fetch(url, {
+        method,
+        body: typeof body === "object" ? JSON.stringify(body) : null,
+        headers: { "Content-Type": "application/json" },
+    });
+    if (res.status === 200) {
+        return await res.json();
+    } else if (res.status === 401) {
+        throw new Error(
+            \`Unauthorized. To implement authorization, override fetcher in the client settings.\`
+        );
+    } else if (res.status === 404 || (res.status > 200 && res.status < 300)) {
+        return null;
+    } else {
+        throw new Error(
+            \`Could not fetch '\${method}' (HTTP \${res.status}: \${res.statusText})\`
+        );
+    }
+}
+
+module.exports.Client = class Client {
+    constructor(settings = {}) {
+        settings.path ||= "";
+        settings.fetcher ||= defaultFetcher;
+        if (settings.path.endsWith("/"))
+            settings.path = settings.path.substring(
+                0,
+                settings.path.length - 1
+            );
+        this.settings = settings;
+    }
+
+    async fetch(method, path, body, query) {
+        return this.settings.fetcher(path, method, body);
+    }
+
+    ${clientClassMethodImplementations.join("\n\n")}
+};
+    `);
+}
+
+function main() {
+    let routeDefinitionsPath = process.argv[2]; // .slice(2).join(" ")
+    if (!routeDefinitionsPath) {
+        throw new Error(
+            "Invalid usage, please specify the files containing your routes"
+        );
+    }
+    console.log("Reading routes from ", routeDefinitionsPath);
+
+    let destinationPackagePath = "example/shared";
+    fs.mkdirSync(destinationPackagePath, { recursive: true });
+
+    let configFileName = ts.findConfigFile(
+        routeDefinitionsPath,
+        ts.sys.fileExists,
+        "tsconfig.json"
+    );
+    if (!configFileName) {
+        throw new Error("tsconfig.json could not be found");
+    }
+    let configFile = ts.readConfigFile(configFileName, ts.sys.readFile);
+    let config = ts.parseJsonConfigFileContent(configFile.config, ts.sys, "./")
+        .options;
+
+    let program = ts.createProgram([routeDefinitionsPath], config);
+
+    let routeTypes: Methods = {};
+    findRouteTypes(
+        program.getSourceFile(routeDefinitionsPath)!.statements,
+        routeTypes
+    );
+
+    // Generate index.d.ts and index.js
+    let typingsOutput = fs.createWriteStream(
+        path.join(destinationPackagePath, "index.d.ts")
+    );
+    let output = fs.createWriteStream(
+        path.join(destinationPackagePath, "index.js")
+    );
+    generatePackageContent(program, routeTypes, typingsOutput, output);
+    typingsOutput.close();
     output.close();
+
+    updatePackage(destinationPackagePath);
 }
 
 main();
