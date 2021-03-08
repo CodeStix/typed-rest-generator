@@ -13,7 +13,8 @@ export interface Post {
     id: string;
     title: string;
     content: string;
-    yikes: Yikes;
+    // yikes: Yikes;
+    exports: Exporttest;
 }
 
 export interface GetPostResponse {

@@ -34,17 +34,6 @@ type EndPoint = {
 
 type ApiType = "req" | "res" | "query" | "params";
 
-function findRouteTypesInFile(fileName: string, output: Methods) {
-    let file = ts.createSourceFile(
-        fileName,
-        fs.readFileSync(fileName, "utf8"),
-        ts.ScriptTarget.ES2015,
-        true
-    );
-
-    findRouteTypes(file.statements, output);
-}
-
 function apiTypeNameToApiTypePropertyName(
     typeName: string
 ): "res" | "req" | "query" | "params" {
@@ -103,12 +92,6 @@ function findRouteTypes(
     }
 }
 
-function mergeArrays<T>(...arr: T[][]): T[] {
-    let a: T[] = [];
-    arr.forEach((e) => a.push(...e));
-    return a;
-}
-
 function resolveTypeReferences(
     node: ts.Node,
     typeChecker: ts.TypeChecker,
@@ -119,38 +102,30 @@ function resolveTypeReferences(
             let interfaceType = typeChecker.getTypeAtLocation(node).symbol;
             output.add(interfaceType);
         }
-
         node.members.forEach((member) => {
-            if (
-                ts.isPropertySignature(member) &&
-                member.type &&
-                ts.isTypeReferenceNode(member.type)
-            ) {
-                let name = member.type.typeName.getText();
-                let symbol = typeChecker
-                    .getTypeAtLocation(member.type)
-                    .getSymbol();
-                if (!symbol) throw new Error(`Type ${name} was not found`);
-                if (symbol.declarations.length > 1)
-                    throw new Error(`Multiple declarations for ${name}`);
-
-                console.log("symbol", name);
-                if (!output.has(symbol)) {
-                    console.log(`looking at ${name}`);
-                    resolveTypeReferences(
-                        symbol.declarations[0],
-                        typeChecker,
-                        output
-                    );
-                } else {
-                    console.log(`already looked at ${name}`);
-                }
+            if (ts.isPropertySignature(member) && member.type) {
+                resolveTypeReferences(member.type, typeChecker, output);
             }
         });
+    } else if (ts.isTypeReferenceNode(node)) {
+        let name = node.typeName.getText();
+        let symbol = typeChecker.getTypeAtLocation(node).getSymbol();
+        if (!symbol) throw new Error(`Type ${name} was not found`);
+        if (symbol.declarations.length > 1)
+            throw new Error(`Multiple declarations for ${name}`);
+        if (!output.has(symbol)) {
+            resolveTypeReferences(symbol.declarations[0], typeChecker, output);
+        } else {
+            console.log(`Already looked at ${name}`);
+        }
     } else if (ts.isTypeAliasDeclaration(node)) {
         let aliasType = typeChecker.getTypeAtLocation(node).aliasSymbol!;
         output.add(aliasType);
         resolveTypeReferences(node.type, typeChecker, output);
+    } else if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node)) {
+        node.types.forEach((type) =>
+            resolveTypeReferences(type, typeChecker, output)
+        );
     }
 }
 
@@ -159,8 +134,6 @@ function main() {
     console.log("path", path);
 
     let output = fs.createWriteStream("output.d.ts");
-
-    // let typeOutputs: string[] = [];
 
     function typeNameToPath(typeName: string) {
         return (
@@ -184,24 +157,15 @@ function main() {
         .options;
 
     let program = ts.createProgram([path], config);
-    // let source = program.getSourceFile(path);
-    let referencedTypes = new Set<ts.Symbol>();
-    // source!.statements.forEach((statement) => {
-    //     resolveTypeReferences(
-    //         statement,
-    //         program.getTypeChecker(),
-    //         referencedTypes
-    //     );
-    // });
 
-    let methods: Methods = {};
-    findRouteTypes(program.getSourceFile(path)!.statements, methods);
-    // findRouteTypesInFile("example/shared/index.d.ts", methods);
+    let referencedTypes = new Set<ts.Symbol>();
+    let routeTypes: Methods = {};
+    findRouteTypes(program.getSourceFile(path)!.statements, routeTypes);
 
     output.write(`export type Endpoints = {\n`);
 
-    Object.keys(methods).forEach((method) => {
-        let pathTypes = methods[method as Method]!;
+    Object.keys(routeTypes).forEach((method) => {
+        let pathTypes = routeTypes[method as Method]!;
 
         output.write(`\t${method}: {\n`);
 
@@ -217,8 +181,6 @@ function main() {
                     program.getTypeChecker(),
                     referencedTypes
                 );
-
-                // typeOutputs.push(type.getFullText() + "\n");
             });
 
             let path = typeNameToPath(pathTypeName);
