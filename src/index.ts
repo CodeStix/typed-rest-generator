@@ -175,7 +175,6 @@ function updatePackage(destinationPackagePath: string) {
             license: "MIT",
             dependencies: {
                 "@types/express-serve-static-core": "^4.17.18",
-                qs: "^6.9.6",
             },
         };
     }
@@ -193,28 +192,6 @@ function getDefaultTypes() {
     return fs.readFileSync(defaultTypesPath, "utf8");
 }
 
-function generateIndex(output: fs.WriteStream) {
-    output.write(`
-interface ClientSettings {
-    path?: string;
-    fetcher?: (url: string, method: string, body?: object) => Promise<any>;
-}
-
-class Client {
-    public readonly settings: ClientSettings;
-
-    constructor(settings?: ClientSettings);
-
-    fetch<Method extends keyof Endpoints, Path extends MethodPath<Method>>(
-        method: Method,
-        path: Path,
-        body?: Endpoints[Method][Path]["req"],
-        query?: Endpoints[Method][Path]["query"]
-    ): Promise<Endpoints[Method][Path]["res"]>;
-}
-`);
-}
-
 function generatePackageContent(
     program: ts.Program,
     routeTypes: Methods,
@@ -224,17 +201,17 @@ function generatePackageContent(
     // Copy default types
     typingsStream.write(getDefaultTypes());
 
-    let referencedTypes = new Set<ts.Node>();
     let clientClassMethodTypings: string[] = [];
     let clientClassMethodImplementations: string[] = [];
+    let endPointsTypings: string[] = [];
+    let referencedTypes = new Set<ts.Node>();
 
-    // Write Endpoints type
-    typingsStream.write(`export type Endpoints = {\n`);
-
+    // Create Endpoints type
+    endPointsTypings.push(`export type Endpoints = {\n`);
     Object.keys(routeTypes).forEach((method) => {
         let pathTypes = routeTypes[method as Method]!;
 
-        typingsStream.write(`\t${method}: {\n`);
+        endPointsTypings.push(`\t${method}: {\n`);
 
         Object.keys(pathTypes).forEach((pathTypeName) => {
             let endpoint = pathTypes[pathTypeName];
@@ -271,23 +248,20 @@ function generatePackageContent(
                 }`
             );
 
-            typingsStream.write(
+            endPointsTypings.push(
                 `\t\t"${path}": Endpoint<${reqType ?? "unknown"}, ${
                     resType ?? "unknown"
                 }, ${paramsType ?? "unknown"}, ${queryType ?? "unknown"}>;\n`
             );
         });
 
-        typingsStream.write(`\t},\n`);
+        endPointsTypings.push(`\t},\n`);
     });
-
-    typingsStream.write(`}\n\n`);
+    endPointsTypings.push(`}\n\n`);
+    typingsStream.write(endPointsTypings.join(""));
 
     // Copy all referenced types
-    referencedTypes.forEach((e) => {
-        let t = e.getText();
-        typingsStream.write(t + "\n");
-    });
+    referencedTypes.forEach((e) => typingsStream.write(e.getText() + "\n"));
 
     // Create Client class typedefs
     typingsStream.write(`
@@ -313,7 +287,7 @@ class Client {
     `);
 
     codeStream.write(`
-async function defaultFetcher(url, method, body) {
+module.exports.defaultFetcher = async function (url, method, body) {
     let res = await fetch(url, {
         method,
         body: typeof body === "object" ? JSON.stringify(body) : null,
@@ -337,7 +311,7 @@ async function defaultFetcher(url, method, body) {
 module.exports.Client = class Client {
     constructor(settings = {}) {
         settings.path ||= "";
-        settings.fetcher ||= defaultFetcher;
+        settings.fetcher ||= module.exports.defaultFetcher;
         if (settings.path.endsWith("/"))
             settings.path = settings.path.substring(
                 0,

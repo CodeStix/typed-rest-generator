@@ -1,4 +1,5 @@
-async function defaultFetcher(url, method, body) {
+
+module.exports.defaultFetcher = async function (url, method, body) {
     let res = await fetch(url, {
         method,
         body: typeof body === "object" ? JSON.stringify(body) : null,
@@ -22,7 +23,7 @@ async function defaultFetcher(url, method, body) {
 module.exports.Client = class Client {
     constructor(settings = {}) {
         settings.path ||= "";
-        settings.fetcher ||= defaultFetcher;
+        settings.fetcher ||= module.exports.defaultFetcher;
         if (settings.path.endsWith("/"))
             settings.path = settings.path.substring(
                 0,
@@ -35,15 +36,16 @@ module.exports.Client = class Client {
         return this.settings.fetcher(path, method, body);
     }
 
-    async postPost(data) {
-        return await this.fetch("post", "/post", data);
-    }
+    async postPost (data) { 
+                    return await this.fetch("post", "/post", data);
+                }
 
-    async postUser(data) {
-        return await this.fetch("post", "/user", data);
-    }
+async postUser (data) { 
+                    return await this.fetch("post", "/user", data);
+                }
 
-    async postUserPost(data) {
-        return await this.fetch("post", "/user/post", data);
-    }
+async postUserPost (data) { 
+                    return await this.fetch("post", "/user/post", data);
+                }
 };
+    

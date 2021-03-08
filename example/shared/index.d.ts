@@ -71,17 +71,12 @@ declare module "express-serve-static-core" {
     }
 }
 export type Endpoints = {
-    post: {
-        "/post": Endpoint<PostPostRequest, PostPostResponse, unknown, unknown>;
-        "/user": Endpoint<
-            PostUserRequest,
-            PostUserResponse,
-            PostUserRequestParams,
-            PostUserRequestQuery
-        >;
-        "/user/post": Endpoint<PostUserPostRequest, unknown, unknown, unknown>;
-    };
-};
+	post: {
+		"/post": Endpoint<PostPostRequest, PostPostResponse, unknown, unknown>;
+		"/user": Endpoint<PostUserRequest, PostUserResponse, PostUserRequestParams, PostUserRequestQuery>;
+		"/user/post": Endpoint<PostUserPostRequest, unknown, unknown, unknown>;
+	},
+}
 
 export type PostPostRequest = {
     id: string;
@@ -90,11 +85,11 @@ export interface PostPostResponse {
     post: Post;
 }
 export type Post = {
-    id: string;
-    title: string;
-    content: string;
-    userId: number;
-};
+  id: string
+  title: string
+  content: string
+  userId: number
+}
 export interface PostUserRequest {
     id: number;
 }
@@ -102,17 +97,17 @@ export interface PostUserResponse {
     user: User;
 }
 export type User = {
-    id: number;
-    email: string;
-    password: string;
-    birthDate: Date;
-    gender: Gender;
-};
+  id: number
+  email: string
+  password: string
+  birthDate: Date
+  gender: Gender
+}
 export const Gender: {
-    male: "male";
-    female: "female";
+  male: 'male',
+  female: 'female'
 };
-export type Gender = typeof Gender[keyof typeof Gender];
+export type Gender = (typeof Gender)[keyof typeof Gender]
 export interface PostUserRequestQuery {
     queryValue: string;
 }
@@ -141,11 +136,10 @@ class Client {
         query?: Endpoints[Method][Path]["query"]
     ): Promise<Endpoints[Method][Path]["res"]>;
 
-    async postPost(data: PostPostRequest): Promise<PostPostResponse>;
+    async postPost (data: PostPostRequest): Promise<PostPostResponse>;
 
-    async postUser(
-        data: PostUserRequest & PostUserRequestQuery
-    ): Promise<PostUserResponse>;
+async postUser (data: PostUserRequest & PostUserRequestQuery): Promise<PostUserResponse>;
 
-    async postUserPost(data: PostUserPostRequest): Promise<void>;
+async postUserPost (data: PostUserPostRequest): Promise<void>;
 }
+    
