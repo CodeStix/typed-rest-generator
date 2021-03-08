@@ -1,39 +1,33 @@
-export type Endpoints = {
-	get: {
-		"/post": Endpoint<GetPostRequest, GetPostResponse, unknown, unknown>;
-		"/user": Endpoint<GetUserRequest, GetUserResponse, GetUserRequestParams, GetUserRequestQuery>;
-		"/user/post": Endpoint<GetUserPostRequest, unknown, unknown, unknown>;
+
+export type Endpoint<Req, Res, Params = never, Query = never> = {
+    req: Req;
+    res: Res;
+    params: Params;
+    query: Query;
+};
+
+export type MethodPath<Method> = keyof Endpoints[Method];
+
+    export type Endpoints = {
+	post: {
+		"/post": Endpoint<PostPostRequest, PostPostResponse, unknown, unknown>;
+		"/user": Endpoint<PostUserRequest, PostUserResponse, PostUserRequestParams, PostUserRequestQuery>;
+		"/user/post": Endpoint<PostUserPostRequest, unknown, unknown, unknown>;
 	},
 }
 
-export type GetPostRequest = {
+export type PostPostRequest = {
     id: string;
 };
-export interface GetPostResponse {
-    yikes: Yikes;
+export interface PostPostResponse {
     post: Date;
 }
-interface Yikes {
-    name: string;
-    post: Post;
-    yikers: Yikes2;
-}
-export type Post = {
-  id: string
-  title: string
-  content: string
-  userId: number
-}
-type Yikes2 = {
-    name: string;
-};
-export type GetUserRequest = {
-    yikes: Yikes | Yikes2;
+export interface PostUserRequest {
     id: number;
-};
-export type GetUserResponse = {
+}
+export interface PostUserResponse {
     user: User;
-};
+}
 export type User = {
   id: number
   email: string
@@ -46,13 +40,13 @@ export const Gender: {
   female: 'female'
 };
 export type Gender = (typeof Gender)[keyof typeof Gender]
-export type GetUserRequestQuery = {
+export interface PostUserRequestQuery {
     queryValue: string;
-};
-export type GetUserRequestParams = {
+}
+export interface PostUserRequestParams {
     paramValue: string;
-};
-export interface GetUserPostRequest {
+}
+export interface PostUserPostRequest {
     id: number;
     text: string;
 }
