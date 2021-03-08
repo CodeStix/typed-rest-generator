@@ -1,8 +1,18 @@
-import core, {
-    RequestHandlerParams,
+/* DO NOT MODIFY, THIS FILE WAS GENERATED */
+
+import {
     RequestHandler,
+    RequestHandlerParams,
 } from "express-serve-static-core";
-import { Endpoints, MethodPath, Endpoint } from "shared";
+
+export type Endpoint<Req, Res, Params = never, Query = never> = {
+    req: Req;
+    res: Res;
+    params: Params;
+    query: Query;
+};
+
+export type MethodPath<Method> = keyof Endpoints[Method];
 
 export type TypedParsedQs<T> = {
     [Key in keyof T]: undefined | string | string[] | ParsedQs<T[Key]>;

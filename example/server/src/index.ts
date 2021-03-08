@@ -7,7 +7,7 @@ app.get("/user" as MethodPath<"get">, (req, res, next) => {
     res.end("hello world");
 });
 
-app.post("/post", (req, res, next) => {});
+app.post("/", (req, res, next) => {});
 
 app.post("", function (req, res, next) {
     req.query.queryValue;

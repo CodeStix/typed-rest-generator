@@ -202,17 +202,8 @@ function main() {
         routeTypes
     );
 
-    output.write(`
-export type Endpoint<Req, Res, Params = never, Query = never> = {
-    req: Req;
-    res: Res;
-    params: Params;
-    query: Query;
-};
-
-export type MethodPath<Method> = keyof Endpoints[Method];
-
-    `);
+    let defaultTypesPath = path.join(__dirname, "types.d.ts");
+    output.write(fs.readFileSync(defaultTypesPath, "utf8"));
 
     output.write(`export type Endpoints = {\n`);
 
