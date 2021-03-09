@@ -73,8 +73,10 @@ declare module "express-serve-static-core" {
 export type Endpoints = {
 	post: {
 		"/post": Endpoint<PostPostRequest, PostPostResponse, unknown, unknown>;
-		"/user": Endpoint<PostUserRequest, PostUserResponse, PostUserRequestParams, PostUserRequestQuery>;
-		"/user/post": Endpoint<PostUserPostRequest, unknown, unknown, unknown>;
+	},
+	get: {
+		"/user": Endpoint<GetUserRequest, GetUserResponse, unknown, unknown>;
+		"/user/post": Endpoint<GetUserPostRequest, unknown, unknown, unknown>;
 	},
 }
 
@@ -90,10 +92,10 @@ export type Post = {
   content: string
   userId: number
 }
-export interface PostUserRequest {
+export interface GetUserRequest {
     id: number;
 }
-export interface PostUserResponse {
+export interface GetUserResponse {
     user: User;
 }
 export type User = {
@@ -108,13 +110,7 @@ export const Gender: {
   female: 'female'
 };
 export type Gender = (typeof Gender)[keyof typeof Gender]
-export interface PostUserRequestQuery {
-    queryValue: string;
-}
-export interface PostUserRequestParams {
-    paramValue: string;
-}
-export interface PostUserPostRequest {
+export interface GetUserPostRequest {
     id: number;
     text: string;
 }
@@ -138,8 +134,8 @@ class Client {
 
     async postPost (data: PostPostRequest): Promise<PostPostResponse>;
 
-async postUser (data: PostUserRequest & PostUserRequestQuery): Promise<PostUserResponse>;
+async getUser (data: GetUserRequest): Promise<GetUserResponse>;
 
-async postUserPost (data: PostUserPostRequest): Promise<void>;
+async getUserPost (data: GetUserPostRequest): Promise<void>;
 }
     

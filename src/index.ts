@@ -4,14 +4,11 @@ import path from "path";
 import { decapitalize, splitCapitalized } from "./helpers";
 import semver from "semver";
 
-export type Method =
-    | "get"
-    | "post"
-    | "put"
-    | "delete"
-    | "patch"
-    | "options"
-    | "head";
+export type Method = "get" | "post" | "put" | "delete" | "patch" | "options" | "head";
+
+export type Output = {
+    methods: Methods;
+};
 
 export type Methods = {
     [M in Method]?: PathTypes;
@@ -22,66 +19,23 @@ export type PathTypes = {
 };
 
 export type EndPoint = {
-    req?:
-        | ts.InterfaceDeclaration
-        | ts.TypeAliasDeclaration
-        | ts.ClassDeclaration;
-    res?:
-        | ts.InterfaceDeclaration
-        | ts.TypeAliasDeclaration
-        | ts.ClassDeclaration;
-    query?:
-        | ts.InterfaceDeclaration
-        | ts.TypeAliasDeclaration
-        | ts.ClassDeclaration;
-    params?:
-        | ts.InterfaceDeclaration
-        | ts.TypeAliasDeclaration
-        | ts.ClassDeclaration;
+    customValidator?: ts.FunctionDeclaration;
+    req?: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration;
+    res?: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration;
 };
 
 export type ApiType = keyof EndPoint;
 
-function apiTypeNameToApiTypePropertyName(
-    typeName: string
-): "res" | "req" | "query" | "params" {
-    switch (typeName) {
-        case "Response":
-            return "res";
-        case "Request":
-            return "req";
-        case "RequestQuery":
-            return "query";
-        case "RequestParams":
-            return "params";
-        default:
-            throw new Error(
-                `Invalid endpoint type ${name} (what is ${typeName}?)`
-            );
-    }
-}
-
-function findRouteTypes(
-    statements: ts.NodeArray<ts.Statement>,
-    output: Methods
-) {
+function findRouteTypes(statements: ts.NodeArray<ts.Statement>, output: Methods) {
     for (let i = 0; i < statements.length; i++) {
         let statement = statements[i];
-        if (
-            ts.isTypeAliasDeclaration(statement) ||
-            ts.isInterfaceDeclaration(statement) ||
-            ts.isClassDeclaration(statement)
-        ) {
+        if (ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement) || ts.isClassDeclaration(statement)) {
             let name = statement.name!.text;
             let m;
-            if (
-                (m = name.match(
-                    /^(Get|Post|Put|Patch|Delete|Head|Options)([a-zA-Z]+)(Response|Request|RequestQuery|RequestParams)$/
-                ))
-            ) {
+            if ((m = name.match(/^(Get|Post|Put|Patch|Delete|Head|Options)([a-zA-Z]+)(Response|Request)$/))) {
                 let method = m[1].toLowerCase() as Method;
                 let pathType = m[2];
-                let apiType = apiTypeNameToApiTypePropertyName(m[3]);
+                let apiType = m[3] === "Request" ? "req" : "res";
 
                 output[method] = {
                     ...output[method],
@@ -92,21 +46,14 @@ function findRouteTypes(
                 };
             }
         } else if (ts.isModuleDeclaration(statement) && statement.body) {
-            findRouteTypes(
-                (statement.body as ts.ModuleBlock).statements,
-                output
-            );
+            findRouteTypes((statement.body as ts.ModuleBlock).statements, output);
         }
     }
 }
 
 const SKIP_TYPES = ["Date", "BigInt", "Decimal"];
 
-function resolveTypeReferences(
-    node: ts.Node,
-    typeChecker: ts.TypeChecker,
-    output: Set<ts.Node>
-) {
+function resolveRecursiveTypeReferences(node: ts.Node, typeChecker: ts.TypeChecker, output: Set<ts.Node>) {
     if (ts.isVariableDeclaration(node)) {
         // Add the variable statement (parent.parent), which contains modifiers
         output.add(node.parent.parent);
@@ -118,7 +65,7 @@ function resolveTypeReferences(
         }
         node.members.forEach((member) => {
             if (ts.isPropertySignature(member) && member.type) {
-                resolveTypeReferences(member.type, typeChecker, output);
+                resolveRecursiveTypeReferences(member.type, typeChecker, output);
             }
         });
     } else if (ts.isTypeReferenceNode(node)) {
@@ -128,22 +75,22 @@ function resolveTypeReferences(
         let type = typeChecker.getTypeFromTypeNode(node);
         let symbol = type.aliasSymbol ?? type.symbol;
         if (!symbol) throw new Error(`Type ${name} was not found`);
-        // if (symbol.declarations.length > 1)
-        //     console.warn(`Multiple declarations for type '${name}'`);
-        symbol.declarations.forEach((decl) =>
-            resolveTypeReferences(decl, typeChecker, output)
-        );
+        symbol.declarations.forEach((decl) => resolveRecursiveTypeReferences(decl, typeChecker, output));
     } else if (ts.isTypeAliasDeclaration(node)) {
         if (!output.has(node)) {
             output.add(node);
-            resolveTypeReferences(node.type, typeChecker, output);
+            resolveRecursiveTypeReferences(node.type, typeChecker, output);
         }
     } else if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node)) {
-        node.types.forEach((type) =>
-            resolveTypeReferences(type, typeChecker, output)
-        );
+        node.types.forEach((type) => resolveRecursiveTypeReferences(type, typeChecker, output));
+    } else if (ts.isImportSpecifier(node)) {
+        let name = node.propertyName?.getText() ?? node.name.getText();
+        let type = typeChecker.getTypeAtLocation(node);
+        let symbol = type.aliasSymbol ?? type.symbol;
+        if (!symbol) throw new Error(`Type ${name} was not found`);
+        symbol.declarations.forEach((decl) => resolveRecursiveTypeReferences(decl, typeChecker, output));
     } else {
-        // console.warn(`Unsupported node ${ts.SyntaxKind[node.kind]}`);
+        console.warn(`Unsupported node ${ts.SyntaxKind[node.kind]}`);
     }
 }
 
@@ -192,12 +139,7 @@ function getDefaultTypes() {
     return fs.readFileSync(defaultTypesPath, "utf8");
 }
 
-function generatePackageContent(
-    program: ts.Program,
-    routeTypes: Methods,
-    typingsStream: fs.WriteStream,
-    codeStream: fs.WriteStream
-) {
+function generatePackageContent(program: ts.Program, routeTypes: Methods, typingsStream: fs.WriteStream, codeStream: fs.WriteStream) {
     // Copy default types
     typingsStream.write(getDefaultTypes());
 
@@ -220,11 +162,7 @@ function generatePackageContent(
                 let node = endpoint[apiType as ApiType];
                 if (!node) return;
 
-                resolveTypeReferences(
-                    node,
-                    program.getTypeChecker(),
-                    referencedTypes
-                );
+                resolveRecursiveTypeReferences(node, program.getTypeChecker(), referencedTypes);
             });
 
             let path = typeNameToPath(pathTypeName);
@@ -232,15 +170,8 @@ function generatePackageContent(
 
             let reqType = endpoint.req?.name?.text;
             let resType = endpoint.res?.name?.text;
-            let paramsType = endpoint.params?.name?.text;
-            let queryType = endpoint.query?.name?.text;
 
-            let paramDefs = [reqType, queryType].filter((e) => e);
-            clientClassMethodTypings.push(
-                `async ${method}${pathTypeName} (${
-                    paramDefs.length > 0 ? "data: " + paramDefs.join(" & ") : ""
-                }): Promise<${resType ?? "void"}>;`
-            );
+            clientClassMethodTypings.push(`async ${method}${pathTypeName} (${reqType ? "data: " + reqType : ""}): Promise<${resType ?? "void"}>;`);
 
             clientClassMethodImplementations.push(
                 `async ${method}${pathTypeName} (data) { 
@@ -248,11 +179,7 @@ function generatePackageContent(
                 }`
             );
 
-            endPointsTypings.push(
-                `\t\t"${path}": Endpoint<${reqType ?? "unknown"}, ${
-                    resType ?? "unknown"
-                }, ${paramsType ?? "unknown"}, ${queryType ?? "unknown"}>;\n`
-            );
+            endPointsTypings.push(`\t\t"${path}": Endpoint<${reqType ?? "unknown"}, ${resType ?? "unknown"}>;\n`);
         });
 
         endPointsTypings.push(`\t},\n`);
@@ -329,50 +256,149 @@ module.exports.Client = class Client {
     `);
 }
 
+function generateFromProgram(program: ts.Program, files: string[]) {
+    files.forEach((file) => generateFromSourceFile(program, program.getSourceFile(file)!));
+}
+
+function generateRoute(node: ts.Node, output: Methods, validators: Validators) {
+    if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) {
+        let name = node.name.text;
+        let m;
+        let regex = /^(Get|Post|Put|Patch|Delete|Head|Options)([a-zA-Z0-9_]+)(Response|Request)$/;
+        if ((m = name.match(regex))) {
+            let method = m[1].toLowerCase() as Method;
+            let pathType = m[2];
+            let apiType = m[3] === "Request" ? "req" : "res";
+
+            output[method] = {
+                ...output[method],
+                [pathType]: {
+                    ...output[method]?.[pathType],
+                    [apiType]: node,
+                },
+            };
+
+            validators[name] = {
+                ...validators[name],
+                validateType: node,
+            };
+        } else {
+            throw new Error(`Malformed route type name '${name}', please match '${regex.source}'`);
+        }
+    } else {
+        throw new Error(`Unsupported route type '${ts.SyntaxKind[node.kind]}' at line ${node.getSourceFile().fileName}:${node.pos}`);
+    }
+}
+
+type Validators = {
+    [typeName: string]: {
+        validateType: ts.Node;
+        customValidator?: ts.FunctionDeclaration;
+    };
+};
+
+function generateValidator(node: ts.Node, output: Validators) {
+    if (ts.isFunctionDeclaration(node)) {
+        if (!node.name) throw new Error(`Every validator function requires a name`);
+        let name = node.name.text;
+        if (node.parameters.length < 1) throw new Error(`The validator '${name}' does not have a parameter which specifies the type it validates.`);
+        let paramType = node.parameters[0].type;
+        if (!paramType) throw new Error(`The validator '${name}' parameter type is not set.`);
+        if (!ts.isTypeReferenceNode(paramType)) throw new Error(`The validator '${name}' parameter type must reference a type directly ('${paramType.getText()}' is invalid).`);
+        let targetTypeName = paramType.typeName.getText();
+        if (output[targetTypeName]) throw new Error(`Duplicate validator for type ${targetTypeName}`);
+        output[targetTypeName] = {
+            customValidator: node,
+            validateType: paramType,
+        };
+        // let type = checker.getTypeAtLocation(paramType);
+    } else {
+        throw new Error(`Unsupported validator type '${ts.SyntaxKind[node.kind]}' at line ${node.getSourceFile().fileName}:${node.pos}`);
+    }
+}
+
+function generateFromSourceFile(program: ts.Program, file: ts.SourceFile) {
+    let checker = program.getTypeChecker();
+    let types = new Set<ts.Node>();
+    let validatorTypes: Validators = {};
+    let methodTypes: Methods = {};
+    file.statements.forEach((stmt) => {
+        if (ts.isModuleDeclaration(stmt)) {
+            if (stmt.name.text === "Validation") {
+                let body = stmt.body! as ts.ModuleBlock;
+                body.statements.forEach((validateFunc) => generateValidator(validateFunc, validatorTypes));
+            } else if (stmt.name.text === "Routes") {
+                let body = stmt.body! as ts.ModuleBlock;
+                body.statements.forEach((routeType) => generateRoute(routeType, methodTypes, validatorTypes));
+            } else {
+                throw new Error(`Unsupported namespace '${stmt.name.text}', expected 'Validation' or 'Routes'`);
+            }
+        } else if (ts.isImportDeclaration(stmt)) {
+            if (!stmt.importClause) throw new Error("Import clause is required");
+            if (stmt.importClause!.isTypeOnly) {
+                // 'import type {} from "" -> Only copy types
+                console.log("Importing types from " + stmt.moduleSpecifier.getText());
+                if (stmt.importClause!.name || !stmt.importClause.namedBindings || !ts.isNamedImports(stmt.importClause.namedBindings))
+                    throw new Error("Only named imports are supported.");
+                let imports = stmt.importClause.namedBindings;
+                imports.elements.forEach((imprt) => resolveRecursiveTypeReferences(imprt, checker, types));
+            } else {
+                // 'import {} from ""' -> Add library reference
+
+                console.log("Importing from " + stmt.moduleSpecifier.getText());
+                throw new Error("Non-type import not yet supported");
+                // let from = stmt.moduleSpecifier.getText();
+                // if (from.startsWith("./")) {
+                // } else {
+                //     // Add lib to package.json
+                // }
+            }
+        } else {
+            types.add(stmt);
+        }
+    });
+
+    console.log("Type count: " + types.size);
+    Object.keys(validatorTypes).forEach((typeName) => {
+        console.log("Validate " + typeName);
+    });
+}
+
 function main() {
+    console.log("Starting...");
+
     let routeDefinitionsPath = process.argv[2]; // .slice(2).join(" ")
     if (!routeDefinitionsPath) {
-        throw new Error(
-            "Invalid usage, please specify the files containing your routes"
-        );
+        throw new Error("Invalid usage, please specify the files containing your routes");
     }
     console.log("Reading routes from ", routeDefinitionsPath);
 
     let destinationPackagePath = "example/shared";
     fs.mkdirSync(destinationPackagePath, { recursive: true });
 
-    let configFileName = ts.findConfigFile(
-        routeDefinitionsPath,
-        ts.sys.fileExists,
-        "tsconfig.json"
-    );
+    let configFileName = ts.findConfigFile(routeDefinitionsPath, ts.sys.fileExists, "tsconfig.json");
     if (!configFileName) {
         throw new Error("tsconfig.json could not be found");
     }
     let configFile = ts.readConfigFile(configFileName, ts.sys.readFile);
-    let config = ts.parseJsonConfigFileContent(configFile.config, ts.sys, "./")
-        .options;
+    let config = ts.parseJsonConfigFileContent(configFile.config, ts.sys, "./").options;
 
     let program = ts.createProgram([routeDefinitionsPath], config);
+    let sourceFile = program.getSourceFile(routeDefinitionsPath);
 
-    let routeTypes: Methods = {};
-    findRouteTypes(
-        program.getSourceFile(routeDefinitionsPath)!.statements,
-        routeTypes
-    );
+    generateFromSourceFile(program, sourceFile!);
 
-    // Generate index.d.ts and index.js
-    let typingsOutput = fs.createWriteStream(
-        path.join(destinationPackagePath, "index.d.ts")
-    );
-    let output = fs.createWriteStream(
-        path.join(destinationPackagePath, "index.js")
-    );
-    generatePackageContent(program, routeTypes, typingsOutput, output);
-    typingsOutput.close();
-    output.close();
+    // let routeTypes: Methods = {};
+    // findRouteTypes(program.getSourceFile(routeDefinitionsPath)!.statements, routeTypes);
 
-    updatePackage(destinationPackagePath);
+    // // Generate index.d.ts and index.js
+    // let typingsOutput = fs.createWriteStream(path.join(destinationPackagePath, "index.d.ts"));
+    // let output = fs.createWriteStream(path.join(destinationPackagePath, "index.js"));
+    // generatePackageContent(program, routeTypes, typingsOutput, output);
+    // typingsOutput.close();
+    // output.close();
+
+    // updatePackage(destinationPackagePath);
 }
 
 main();

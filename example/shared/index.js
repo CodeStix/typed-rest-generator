@@ -40,12 +40,12 @@ module.exports.Client = class Client {
                     return await this.fetch("post", "/post", data);
                 }
 
-async postUser (data) { 
-                    return await this.fetch("post", "/user", data);
+async getUser (data) { 
+                    return await this.fetch("get", "/user", data);
                 }
 
-async postUserPost (data) { 
-                    return await this.fetch("post", "/user/post", data);
+async getUserPost (data) { 
+                    return await this.fetch("get", "/user/post", data);
                 }
 };
     
