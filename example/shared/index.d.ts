@@ -76,6 +76,25 @@ export type Endpoints = {
 	},
 }
 
+export type Post = {
+  id: string
+  title: string
+  content: string
+  userId: number
+}
+export type User = {
+  id: number
+  email: string
+  password: string
+  birthDate: Date
+  gender: Gender
+}
+export const Gender: {
+  male: 'male',
+  female: 'female'
+}
+export type Gender = (typeof Gender)[keyof typeof Gender]
+interface ValidationContext {}
 export type PostPostRequest = {
         id: string;
     };

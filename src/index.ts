@@ -32,31 +32,6 @@ export type EndPoint = {
 
 export type ApiType = keyof EndPoint;
 
-function findRouteTypes(statements: ts.NodeArray<ts.Statement>, output: Methods) {
-    for (let i = 0; i < statements.length; i++) {
-        let statement = statements[i];
-        if (ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement) || ts.isClassDeclaration(statement)) {
-            let name = statement.name!.text;
-            let m;
-            if ((m = name.match(/^(Get|Post|Put|Patch|Delete|Head|Options)([a-zA-Z]+)(Response|Request)$/))) {
-                let method = m[1].toLowerCase() as Method;
-                let pathType = m[2];
-                let apiType = m[3] === "Request" ? "req" : "res";
-
-                output[method] = {
-                    ...output[method],
-                    [pathType]: {
-                        ...output[method]?.[pathType],
-                        [apiType]: statement,
-                    },
-                };
-            }
-        } else if (ts.isModuleDeclaration(statement) && statement.body) {
-            findRouteTypes((statement.body as ts.ModuleBlock).statements, output);
-        }
-    }
-}
-
 const SKIP_TYPES = ["Date", "BigInt", "Decimal"];
 
 /**
@@ -105,15 +80,6 @@ function resolveRecursiveTypeReferences(node: ts.Node, typeChecker: ts.TypeCheck
     }
 }
 
-function typeNameToPath(typeName: string) {
-    return (
-        "/" +
-        splitCapitalized(typeName)
-            .map((e) => decapitalize(e))
-            .join("/")
-    );
-}
-
 function updatePackage(destinationPackagePath: string) {
     // Create or update (increase version) package.json
     let packageJsonPath = path.join(destinationPackagePath, "package.json");
@@ -150,14 +116,22 @@ function getDefaultTypes() {
     return fs.readFileSync(defaultTypesPath, "utf8");
 }
 
-function generatePackageContent(validators: Validators, routeTypes: Methods, typingsStream: fs.WriteStream, codeStream: fs.WriteStream) {
+function typeNameToPath(typeName: string) {
+    return (
+        "/" +
+        splitCapitalized(typeName)
+            .map((e) => decapitalize(e))
+            .join("/")
+    );
+}
+
+function generatePackageContent(types: Set<ts.Node>, validators: Validators, routeTypes: Methods, typingsStream: fs.WriteStream, codeStream: fs.WriteStream) {
     // Copy default types
     typingsStream.write(getDefaultTypes());
 
     let clientClassMethodTypings: string[] = [];
     let clientClassMethodImplementations: string[] = [];
     let endPointsTypings: string[] = [];
-    let referencedTypes = new Set<ts.Node>();
 
     // Create Endpoints type
     endPointsTypings.push(`export type Endpoints = {\n`);
@@ -173,8 +147,7 @@ function generatePackageContent(validators: Validators, routeTypes: Methods, typ
                 let node = endpoint[apiType as ApiType];
                 if (!node) return;
 
-                referencedTypes.add(node.type);
-                node.deepReferences.forEach((e) => referencedTypes.add(e));
+                node.deepReferences.forEach((e) => types.add(e));
             });
 
             let path = typeNameToPath(pathTypeName);
@@ -205,7 +178,14 @@ function generatePackageContent(validators: Validators, routeTypes: Methods, typ
     });
 
     // Copy all referenced types
-    referencedTypes.forEach((e) => typingsStream.write(e.getText() + "\n"));
+    types.forEach((e) => {
+        if (ts.isVariableDeclaration(e)) {
+            // A variable declaration does not contain its modifiers
+            typingsStream.write(`export const ${e.getText()}\n`);
+        } else {
+            typingsStream.write(`${e.getText()}\n`);
+        }
+    });
 
     // Create Client class typedefs
     typingsStream.write(`
@@ -273,7 +253,7 @@ module.exports.Client = class Client {
     `);
 }
 
-function getRouteTypes(node: ts.Node, typeChecker: ts.TypeChecker, output: Methods, validators: Validators) {
+function getRouteTypes(node: ts.Node, typeChecker: ts.TypeChecker, methods: Methods, validators: Validators) {
     if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) {
         let name = node.name.text;
         let m;
@@ -286,10 +266,10 @@ function getRouteTypes(node: ts.Node, typeChecker: ts.TypeChecker, output: Metho
             let references = new Set<ts.Node>();
             resolveRecursiveTypeReferences(node, typeChecker, references);
 
-            output[method] = {
-                ...output[method],
+            methods[method] = {
+                ...methods[method],
                 [pathType]: {
-                    ...output[method]?.[pathType],
+                    ...methods[method]?.[pathType],
                     [apiType]: {
                         type: node,
                         deepReferences: references,
@@ -436,7 +416,7 @@ function main() {
 
     let typingsOutput = fs.createWriteStream(path.join(destinationPackagePath, "index.d.ts"));
     let output = fs.createWriteStream(path.join(destinationPackagePath, "index.js"));
-    generatePackageContent(validatorTypes, methodTypes, typingsOutput, output);
+    generatePackageContent(types, validatorTypes, methodTypes, typingsOutput, output);
     typingsOutput.close();
     output.close();
 
