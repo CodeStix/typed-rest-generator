@@ -17,34 +17,29 @@ namespace Routes {
         id: string;
     };
 
-    export interface PostPostResponse {
-        post: Post;
-    }
+    // export interface PostPostResponse {
+    //     post: Post;
+    // }
 
-    export interface GetUserRequest {
-        id: number;
-    }
+    // export interface GetUserRequest {
+    //     id: number;
+    // }
 
-    export interface GetUserResponse {
-        user: User;
-    }
+    // export interface GetUserResponse {
+    //     user: User;
+    // }
 
-    export interface GetUserPostRequest {
-        id: number;
-        text: string;
-    }
+    // export interface GetUserPostRequest {
+    //     id: number;
+    //     text: string;
+    // }
 }
 
 namespace Validation {
-    function validatePostPostRequest(data: Routes.PostPostRequest, context: ValidationContext) {}
-
-    function validatePostPostResponse(data: Routes.PostPostResponse, context: ValidationContext) {}
-
-    function validateGetUserRequest(data: Routes.GetUserRequest, context: ValidationContext) {}
-
-    function validateGetUserResponse(data: Routes.GetUserResponse, context: ValidationContext) {}
-
-    function validateGetUserPostRequest(data: Routes.GetUserPostRequest, context: ValidationContext) {}
-
-    function validateContext(data: ValidationContext) {}
+    // function validatePostPostRequest(data: Routes.PostPostRequest, context: ValidationContext) {}
+    // function validatePostPostResponse(data: Routes.PostPostResponse, context: ValidationContext) {}
+    // function validateGetUserRequest(data: Routes.GetUserRequest, context: ValidationContext) {}
+    // function validateGetUserResponse(data: Routes.GetUserResponse, context: ValidationContext) {}
+    // function validateGetUserPostRequest(data: Routes.GetUserPostRequest, context: ValidationContext) {}
+    // function validateContext(data: ValidationContext) {}
 }

@@ -59,10 +59,15 @@ function findRouteTypes(statements: ts.NodeArray<ts.Statement>, output: Methods)
 
 const SKIP_TYPES = ["Date", "BigInt", "Decimal"];
 
+/**
+ * @param node Find out which types this node references.
+ * @param typeChecker
+ * @param output The set to fill with node that were referenced recursively.
+ */
 function resolveRecursiveTypeReferences(node: ts.Node, typeChecker: ts.TypeChecker, output: Set<ts.Node>) {
     if (ts.isVariableDeclaration(node)) {
-        // Add the variable statement (parent.parent), which contains modifiers
-        output.add(node.parent.parent);
+        // parent.parent
+        output.add(node);
     } else if (ts.isInterfaceDeclaration(node) || ts.isTypeLiteralNode(node)) {
         // Type literal was already added below
         if (ts.isInterfaceDeclaration(node)) {
@@ -194,6 +199,11 @@ function generatePackageContent(validators: Validators, routeTypes: Methods, typ
     endPointsTypings.push(`}\n\n`);
     typingsStream.write(endPointsTypings.join(""));
 
+    Object.keys(validators).forEach((validateTypeName) => {
+        let validator = validators[validateTypeName];
+        console.log(`${validateTypeName} hasCustom=${!!validator.customValidator}`);
+    });
+
     // Copy all referenced types
     referencedTypes.forEach((e) => typingsStream.write(e.getText() + "\n"));
 
@@ -254,7 +264,7 @@ module.exports.Client = class Client {
         this.settings = settings;
     }
 
-    async fetch(method, path, body, query) {
+    async fetch(method, path, body) {
         return this.settings.fetcher(path, method, body);
     }
 
@@ -263,11 +273,7 @@ module.exports.Client = class Client {
     `);
 }
 
-function generateFromProgram(program: ts.Program, files: string[]) {
-    files.forEach((file) => generateFromSourceFile(program, program.getSourceFile(file)!));
-}
-
-function generateRoute(node: ts.Node, typeChecker: ts.TypeChecker, output: Methods, validators: Validators) {
+function getRouteTypes(node: ts.Node, typeChecker: ts.TypeChecker, output: Methods, validators: Validators) {
     if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) {
         let name = node.name.text;
         let m;
@@ -291,10 +297,17 @@ function generateRoute(node: ts.Node, typeChecker: ts.TypeChecker, output: Metho
                 },
             };
 
-            validators[name] = {
-                ...validators[name],
-                validateType: node,
-            };
+            references.forEach((e) => {
+                if (ts.isVariableDeclaration(e)) return;
+                let type = typeChecker.getTypeAtLocation(e);
+                if (!type || (!type.symbol && !type.aliasSymbol)) throw new Error(`Type to validate was not found. ${ts.SyntaxKind[e.kind]} ${e.getText()} `);
+                let symbol = type.aliasSymbol ?? type.symbol;
+                if (validators[symbol.name]) return;
+                validators[symbol.name] = {
+                    ...validators[symbol.name],
+                    validateType: e,
+                };
+            });
         } else {
             throw new Error(`Malformed route type name '${name}', please match '${regex.source}'`);
         }
@@ -310,7 +323,7 @@ type Validators = {
     };
 };
 
-function generateCustomValidator(node: ts.Node, typeChecker: ts.TypeChecker, output: Validators) {
+function getCustomValidatorTypes(node: ts.Node, typeChecker: ts.TypeChecker, output: Validators) {
     if (ts.isFunctionDeclaration(node)) {
         if (!node.name) throw new Error(`Every validator function requires a name`);
         let name = node.name.text;
@@ -318,33 +331,47 @@ function generateCustomValidator(node: ts.Node, typeChecker: ts.TypeChecker, out
         let paramType = node.parameters[0].type;
         if (!paramType) throw new Error(`The validator '${name}' parameter type is not set.`);
         if (!ts.isTypeReferenceNode(paramType)) throw new Error(`The validator '${name}' parameter type must reference a type directly ('${paramType.getText()}' is invalid).`);
+
         let targetTypeName = paramType.typeName.getText();
-        if (output[targetTypeName]) throw new Error(`Duplicate validator for type ${targetTypeName}`);
         let type = typeChecker.getTypeAtLocation(paramType);
         if (!type || (!type.symbol && !type.aliasSymbol)) throw new Error(`Type to validate (${targetTypeName}) was not found.`);
         let symbol = type.aliasSymbol ?? type.symbol;
+
+        if (output[symbol.name]?.customValidator) throw new Error(`Duplicate validator for type ${symbol.name}`);
         output[symbol.name] = {
-            customValidator: node,
+            ...output[symbol.name],
             validateType: paramType,
+            customValidator: node,
         };
+
+        let references = new Set<ts.Node>();
+        resolveRecursiveTypeReferences(paramType, typeChecker, references);
+        references.forEach((e) => {
+            if (ts.isVariableDeclaration(e)) return;
+            let type = typeChecker.getTypeAtLocation(e);
+            if (!type || (!type.symbol && !type.aliasSymbol)) throw new Error(`Type to validate was not found. ${e.getText()}`);
+            let symbol = type.aliasSymbol ?? type.symbol;
+            if (output[symbol.name]) return;
+            output[symbol.name] = {
+                ...output[symbol.name],
+                validateType: e,
+            };
+        });
     } else {
         throw new Error(`Unsupported validator type '${ts.SyntaxKind[node.kind]}' at line ${node.getSourceFile().fileName}:${node.pos}`);
     }
 }
 
-function generateFromSourceFile(program: ts.Program, file: ts.SourceFile) {
+function generateFromSourceFile(program: ts.Program, file: ts.SourceFile, types: Set<ts.Node>, methodTypes: Methods, validatorTypes: Validators) {
     let checker = program.getTypeChecker();
-    let types = new Set<ts.Node>();
-    let validatorTypes: Validators = {};
-    let methodTypes: Methods = {};
     file.statements.forEach((stmt) => {
         if (ts.isModuleDeclaration(stmt)) {
             if (stmt.name.text === "Validation") {
                 let body = stmt.body! as ts.ModuleBlock;
-                body.statements.forEach((validateFunc) => generateCustomValidator(validateFunc, checker, validatorTypes));
+                body.statements.forEach((validateFunc) => getCustomValidatorTypes(validateFunc, checker, validatorTypes));
             } else if (stmt.name.text === "Routes") {
                 let body = stmt.body! as ts.ModuleBlock;
-                body.statements.forEach((routeType) => generateRoute(routeType, checker, methodTypes, validatorTypes));
+                body.statements.forEach((routeType) => getRouteTypes(routeType, checker, methodTypes, validatorTypes));
             } else {
                 throw new Error(`Unsupported namespace '${stmt.name.text}', expected 'Validation' or 'Routes'`);
             }
@@ -373,10 +400,10 @@ function generateFromSourceFile(program: ts.Program, file: ts.SourceFile) {
     });
 
     // console.log("Type count: " + types.size);
-    types.forEach((e) => console.log(e.getText()));
-    Object.keys(validatorTypes).forEach((typeName) => {
-        console.log("Validate " + typeName);
-    });
+    // types.forEach((e) => console.log(e.getText()));
+    // Object.keys(validatorTypes).forEach((typeName) => {
+    //     console.log("Validate " + typeName);
+    // });
 }
 
 function main() {
@@ -399,21 +426,21 @@ function main() {
     let config = ts.parseJsonConfigFileContent(configFile.config, ts.sys, "./").options;
 
     let program = ts.createProgram([routeDefinitionsPath], config);
-    let sourceFile = program.getSourceFile(routeDefinitionsPath);
 
-    generateFromSourceFile(program, sourceFile!);
+    let types = new Set<ts.Node>();
+    let validatorTypes: Validators = {};
+    let methodTypes: Methods = {};
+    // files.forEach((file) => generateFromSourceFile(program, program.getSourceFile(file)!, types, methodTypes, validatorTypes));
+    let sourceFile = program.getSourceFile(routeDefinitionsPath)!;
+    generateFromSourceFile(program, sourceFile, types, methodTypes, validatorTypes);
 
-    // let routeTypes: Methods = {};
-    // findRouteTypes(program.getSourceFile(routeDefinitionsPath)!.statements, routeTypes);
+    let typingsOutput = fs.createWriteStream(path.join(destinationPackagePath, "index.d.ts"));
+    let output = fs.createWriteStream(path.join(destinationPackagePath, "index.js"));
+    generatePackageContent(validatorTypes, methodTypes, typingsOutput, output);
+    typingsOutput.close();
+    output.close();
 
-    // // Generate index.d.ts and index.js
-    // let typingsOutput = fs.createWriteStream(path.join(destinationPackagePath, "index.d.ts"));
-    // let output = fs.createWriteStream(path.join(destinationPackagePath, "index.js"));
-    // generatePackageContent(program, routeTypes, typingsOutput, output);
-    // typingsOutput.close();
-    // output.close();
-
-    // updatePackage(destinationPackagePath);
+    updatePackage(destinationPackagePath);
 }
 
 main();

@@ -72,48 +72,13 @@ declare module "express-serve-static-core" {
 }
 export type Endpoints = {
 	post: {
-		"/post": Endpoint<PostPostRequest, PostPostResponse, unknown, unknown>;
-	},
-	get: {
-		"/user": Endpoint<GetUserRequest, GetUserResponse, unknown, unknown>;
-		"/user/post": Endpoint<GetUserPostRequest, unknown, unknown, unknown>;
+		"/post": Endpoint<PostPostRequest, unknown>;
 	},
 }
 
 export type PostPostRequest = {
-    id: string;
-};
-export interface PostPostResponse {
-    post: Post;
-}
-export type Post = {
-  id: string
-  title: string
-  content: string
-  userId: number
-}
-export interface GetUserRequest {
-    id: number;
-}
-export interface GetUserResponse {
-    user: User;
-}
-export type User = {
-  id: number
-  email: string
-  password: string
-  birthDate: Date
-  gender: Gender
-}
-export const Gender: {
-  male: 'male',
-  female: 'female'
-};
-export type Gender = (typeof Gender)[keyof typeof Gender]
-export interface GetUserPostRequest {
-    id: number;
-    text: string;
-}
+        id: string;
+    };
 
 interface ClientSettings {
     path?: string;
@@ -132,10 +97,6 @@ class Client {
         query?: Endpoints[Method][Path]["query"]
     ): Promise<Endpoints[Method][Path]["res"]>;
 
-    async postPost (data: PostPostRequest): Promise<PostPostResponse>;
-
-async getUser (data: GetUserRequest): Promise<GetUserResponse>;
-
-async getUserPost (data: GetUserPostRequest): Promise<void>;
+    async postPost (data: PostPostRequest): Promise<void>;
 }
     

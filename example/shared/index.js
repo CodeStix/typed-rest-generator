@@ -32,20 +32,12 @@ module.exports.Client = class Client {
         this.settings = settings;
     }
 
-    async fetch(method, path, body, query) {
+    async fetch(method, path, body) {
         return this.settings.fetcher(path, method, body);
     }
 
     async postPost (data) { 
                     return await this.fetch("post", "/post", data);
-                }
-
-async getUser (data) { 
-                    return await this.fetch("get", "/user", data);
-                }
-
-async getUserPost (data) { 
-                    return await this.fetch("get", "/user/post", data);
                 }
 };
     
