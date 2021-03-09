@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { decapitalize, splitCapitalized } from "./helpers";
 import semver from "semver";
+import { notEqual } from "assert";
 
 export type Method = "get" | "post" | "put" | "delete" | "patch" | "options" | "head";
 
@@ -19,9 +20,14 @@ export type PathTypes = {
 };
 
 export type EndPoint = {
-    customValidator?: ts.FunctionDeclaration;
-    req?: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration;
-    res?: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration;
+    req?: {
+        type: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration;
+        deepReferences: Set<ts.Node>;
+    };
+    res?: {
+        type: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration;
+        deepReferences: Set<ts.Node>;
+    };
 };
 
 export type ApiType = keyof EndPoint;
@@ -139,7 +145,7 @@ function getDefaultTypes() {
     return fs.readFileSync(defaultTypesPath, "utf8");
 }
 
-function generatePackageContent(program: ts.Program, routeTypes: Methods, typingsStream: fs.WriteStream, codeStream: fs.WriteStream) {
+function generatePackageContent(validators: Validators, routeTypes: Methods, typingsStream: fs.WriteStream, codeStream: fs.WriteStream) {
     // Copy default types
     typingsStream.write(getDefaultTypes());
 
@@ -162,14 +168,15 @@ function generatePackageContent(program: ts.Program, routeTypes: Methods, typing
                 let node = endpoint[apiType as ApiType];
                 if (!node) return;
 
-                resolveRecursiveTypeReferences(node, program.getTypeChecker(), referencedTypes);
+                referencedTypes.add(node.type);
+                node.deepReferences.forEach((e) => referencedTypes.add(e));
             });
 
             let path = typeNameToPath(pathTypeName);
             console.log(`${pathTypeName} --> ${path}`);
 
-            let reqType = endpoint.req?.name?.text;
-            let resType = endpoint.res?.name?.text;
+            let reqType = endpoint.req?.type.name?.text;
+            let resType = endpoint.res?.type.name?.text;
 
             clientClassMethodTypings.push(`async ${method}${pathTypeName} (${reqType ? "data: " + reqType : ""}): Promise<${resType ?? "void"}>;`);
 
@@ -260,7 +267,7 @@ function generateFromProgram(program: ts.Program, files: string[]) {
     files.forEach((file) => generateFromSourceFile(program, program.getSourceFile(file)!));
 }
 
-function generateRoute(node: ts.Node, output: Methods, validators: Validators) {
+function generateRoute(node: ts.Node, typeChecker: ts.TypeChecker, output: Methods, validators: Validators) {
     if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) {
         let name = node.name.text;
         let m;
@@ -270,11 +277,17 @@ function generateRoute(node: ts.Node, output: Methods, validators: Validators) {
             let pathType = m[2];
             let apiType = m[3] === "Request" ? "req" : "res";
 
+            let references = new Set<ts.Node>();
+            resolveRecursiveTypeReferences(node, typeChecker, references);
+
             output[method] = {
                 ...output[method],
                 [pathType]: {
                     ...output[method]?.[pathType],
-                    [apiType]: node,
+                    [apiType]: {
+                        type: node,
+                        deepReferences: references,
+                    },
                 },
             };
 
@@ -297,7 +310,7 @@ type Validators = {
     };
 };
 
-function generateValidator(node: ts.Node, output: Validators) {
+function generateCustomValidator(node: ts.Node, typeChecker: ts.TypeChecker, output: Validators) {
     if (ts.isFunctionDeclaration(node)) {
         if (!node.name) throw new Error(`Every validator function requires a name`);
         let name = node.name.text;
@@ -307,11 +320,13 @@ function generateValidator(node: ts.Node, output: Validators) {
         if (!ts.isTypeReferenceNode(paramType)) throw new Error(`The validator '${name}' parameter type must reference a type directly ('${paramType.getText()}' is invalid).`);
         let targetTypeName = paramType.typeName.getText();
         if (output[targetTypeName]) throw new Error(`Duplicate validator for type ${targetTypeName}`);
-        output[targetTypeName] = {
+        let type = typeChecker.getTypeAtLocation(paramType);
+        if (!type || (!type.symbol && !type.aliasSymbol)) throw new Error(`Type to validate (${targetTypeName}) was not found.`);
+        let symbol = type.aliasSymbol ?? type.symbol;
+        output[symbol.name] = {
             customValidator: node,
             validateType: paramType,
         };
-        // let type = checker.getTypeAtLocation(paramType);
     } else {
         throw new Error(`Unsupported validator type '${ts.SyntaxKind[node.kind]}' at line ${node.getSourceFile().fileName}:${node.pos}`);
     }
@@ -326,10 +341,10 @@ function generateFromSourceFile(program: ts.Program, file: ts.SourceFile) {
         if (ts.isModuleDeclaration(stmt)) {
             if (stmt.name.text === "Validation") {
                 let body = stmt.body! as ts.ModuleBlock;
-                body.statements.forEach((validateFunc) => generateValidator(validateFunc, validatorTypes));
+                body.statements.forEach((validateFunc) => generateCustomValidator(validateFunc, checker, validatorTypes));
             } else if (stmt.name.text === "Routes") {
                 let body = stmt.body! as ts.ModuleBlock;
-                body.statements.forEach((routeType) => generateRoute(routeType, methodTypes, validatorTypes));
+                body.statements.forEach((routeType) => generateRoute(routeType, checker, methodTypes, validatorTypes));
             } else {
                 throw new Error(`Unsupported namespace '${stmt.name.text}', expected 'Validation' or 'Routes'`);
             }
@@ -344,7 +359,6 @@ function generateFromSourceFile(program: ts.Program, file: ts.SourceFile) {
                 imports.elements.forEach((imprt) => resolveRecursiveTypeReferences(imprt, checker, types));
             } else {
                 // 'import {} from ""' -> Add library reference
-
                 console.log("Importing from " + stmt.moduleSpecifier.getText());
                 throw new Error("Non-type import not yet supported");
                 // let from = stmt.moduleSpecifier.getText();
@@ -358,7 +372,8 @@ function generateFromSourceFile(program: ts.Program, file: ts.SourceFile) {
         }
     });
 
-    console.log("Type count: " + types.size);
+    // console.log("Type count: " + types.size);
+    types.forEach((e) => console.log(e.getText()));
     Object.keys(validatorTypes).forEach((typeName) => {
         console.log("Validate " + typeName);
     });

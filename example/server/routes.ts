@@ -45,4 +45,6 @@ namespace Validation {
     function validateGetUserResponse(data: Routes.GetUserResponse, context: ValidationContext) {}
 
     function validateGetUserPostRequest(data: Routes.GetUserPostRequest, context: ValidationContext) {}
+
+    function validateContext(data: ValidationContext) {}
 }
