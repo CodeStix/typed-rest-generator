@@ -1,14 +1,14 @@
-import ts from "typescript";
+import ts, { SymbolFlags } from "byots";
 import fs from "fs";
 import path from "path";
 import { decapitalize, splitCapitalized } from "./helpers";
 import semver from "semver";
-import { notEqual } from "assert";
 
 type Validators = {
     [typeName: string]: {
-        paramType: ts.Node;
-        customValidator?: ts.FunctionDeclaration;
+        // paramType: ts.Node;
+        symbol: ts.Symbol;
+        customValidator?: ts.Symbol;
     };
 };
 
@@ -29,11 +29,11 @@ export type PathTypes = {
 export type EndPoint = {
     req?: {
         type: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration;
-        deepReferences: Set<ts.Node>;
+        deepReferences: Set<ts.Symbol>;
     };
     res?: {
         type: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration;
-        deepReferences: Set<ts.Node>;
+        deepReferences: Set<ts.Symbol>;
     };
 };
 
@@ -46,11 +46,10 @@ const SKIP_TYPES = ["Date", "BigInt", "Decimal"];
  * @param typeChecker
  * @param output The set to fill with node that were referenced recursively.
  */
-function resolveRecursiveTypeReferences(node: ts.Node, typeChecker: ts.TypeChecker, output: Set<ts.Node>) {
+function resolveRecursiveTypeReferences(node: ts.Node, typeChecker: ts.TypeChecker, output: Set<ts.Symbol>) {
     if (ts.isInterfaceDeclaration(node) || ts.isTypeLiteralNode(node)) {
         node.members.forEach((member) => {
             if (ts.isPropertySignature(member) && member.type) {
-                console.log("Resolve property type", member.name.getText());
                 resolveRecursiveTypeReferences(member.type, typeChecker, output);
             }
         });
@@ -58,12 +57,13 @@ function resolveRecursiveTypeReferences(node: ts.Node, typeChecker: ts.TypeCheck
         // Find where type is defined
         let name = node.typeName.getText();
         if (SKIP_TYPES.includes(name)) return;
-        let type = typeChecker.getTypeFromTypeNode(node);
-        let symbol = type.aliasSymbol ?? type.symbol;
-        if (!symbol) throw new Error(`Type ${name} was not found`);
-        symbol.declarations.forEach((decl) => {
-            if (output.has(decl)) return;
-            output.add(decl);
+
+        let symbol = typeChecker.getSymbolAtLocation(node.typeName);
+        if (!symbol) throw new Error(`Type ${name} was not found '${node.parent.parent.getText()}'`);
+
+        if (output.has(symbol)) return;
+        output.add(symbol);
+        symbol.declarations!.forEach((decl) => {
             resolveRecursiveTypeReferences(decl, typeChecker, output);
         });
     } else if (ts.isTypeAliasDeclaration(node)) {
@@ -71,11 +71,11 @@ function resolveRecursiveTypeReferences(node: ts.Node, typeChecker: ts.TypeCheck
     } else if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node)) {
         node.types.forEach((type) => resolveRecursiveTypeReferences(type, typeChecker, output));
     } else if (ts.isImportSpecifier(node)) {
-        let name = node.propertyName?.getText() ?? node.name.getText();
-        let type = typeChecker.getTypeAtLocation(node);
-        let symbol = type.aliasSymbol ?? type.symbol;
-        if (!symbol) throw new Error(`Type ${name} was not found`);
-        symbol.declarations.forEach((decl) => resolveRecursiveTypeReferences(decl, typeChecker, output));
+        let symbol = typeChecker.getSymbolAtLocation(node.propertyName ?? node.name);
+        if (!symbol) throw new Error(`Type ${node.propertyName?.getText() ?? node.name.getText()} was not found (import)`);
+        if (output.has(symbol)) return;
+        output.add(symbol);
+        symbol.declarations!.forEach((decl) => resolveRecursiveTypeReferences(decl, typeChecker, output));
     } else {
         // console.warn(`Unsupported node ${ts.SyntaxKind[node.kind]}`);
     }
@@ -126,13 +126,36 @@ function typeNameToPath(typeName: string) {
     );
 }
 
-function generatePackageContent(types: Set<ts.Node>, validators: Validators, methods: Methods, outputStream: fs.WriteStream) {
+function symbolFlagsToString(flags: SymbolFlags) {
+    let str = [];
+    for (let flag in ts.SymbolFlags) {
+        let n = parseInt(ts.SymbolFlags[flag]);
+        if ((flags & n) === n) {
+            str.push(flag);
+        }
+    }
+    return str.join(", ");
+}
+
+function getImportName(symbol: ts.Symbol): string {
+    if (!symbol.parent?.parent) return symbol.name;
+    return getImportName(symbol.parent);
+}
+
+function getUsageName(symbol: ts.Symbol): string {
+    if (!symbol.parent?.parent) return symbol.name;
+    return getUsageName(symbol.parent) + "." + symbol.name;
+}
+
+function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validators, methods: Methods, outputStream: fs.WriteStream) {
     // Copy default types
     outputStream.write(getDefaultTypes());
 
     let clientClassMethodImplementations: string[] = [];
     let endPointsTypings: string[] = [];
-    let routeTypes = new Set<ts.Node>();
+    // let routeTypes = new Set<ts.Node>();
+
+    let typesToImport = new Set<ts.Symbol>();
 
     // Create Endpoints type
     endPointsTypings.push(`export type Endpoints = {\n`);
@@ -148,8 +171,8 @@ function generatePackageContent(types: Set<ts.Node>, validators: Validators, met
                 let node = endpoint[apiType as ApiType];
                 if (!node) return;
 
-                routeTypes.add(node.type);
-                node.deepReferences.forEach((e) => routeTypes.add(e));
+                // routeTypes.add(node.type);
+                node.deepReferences.forEach((e) => typesToImport.add(e));
             });
 
             let path = typeNameToPath(pathTypeName);
@@ -158,50 +181,59 @@ function generatePackageContent(types: Set<ts.Node>, validators: Validators, met
             let reqType = endpoint.req?.type.name?.text;
             let resType = endpoint.res?.type.name?.text;
 
-            clientClassMethodImplementations.push(`async ${method}${pathTypeName} (${reqType ? "data: " + reqType : ""}): Promise<${resType ?? "void"}> {
+            clientClassMethodImplementations.push(`async ${method}${pathTypeName} (${reqType ? "data: Routes." + reqType : ""}): Promise<Routes.${resType ?? "void"}> {
                 return await this.fetch("${method}", "${path}", data);
             }`);
 
-            endPointsTypings.push(`\t\t"${path}": Endpoint<${reqType ?? "unknown"}, ${resType ?? "unknown"}>;\n`);
+            endPointsTypings.push(`\t\t"${path}": Endpoint<${reqType ? "Routes." + reqType : "unknown"}, ${resType ? "Routes." + reqType : "unknown"}>;\n`);
         });
 
         endPointsTypings.push(`\t},\n`);
     });
     endPointsTypings.push(`}\n\n`);
 
-    outputStream.write(`export namespace Routes {\n`);
-    outputStream.write(endPointsTypings.join(""));
-    routeTypes.forEach((e) => {
-        if (ts.isVariableDeclaration(e)) {
-            // A variable declaration does not contain its modifiers
-            outputStream.write(`export const ${e.getText()}\n`);
-        } else {
-            outputStream.write(`${e.getText()}\n`);
-        }
-    });
-    outputStream.write(`}\n\n`);
-
-    // Copy all referenced types
-    types.forEach((e) => {
-        console.log("Type", (e as any)["name"]?.text);
-        if (ts.isVariableDeclaration(e)) {
-            // A variable declaration does not contain its modifiers
-            outputStream.write(`export const ${e.getText()}\n`);
-        } else {
-            outputStream.write(`${e.getText()}\n`);
-        }
-    });
-
     let validatorImplementations: string[] = [];
-
     Object.keys(validators).forEach((validateTypeName) => {
         let validator = validators[validateTypeName];
-        let paramName = validator.paramType.getText();
-        validatorImplementations.push(`public static validate${validateTypeName}(data: ${paramName}): ErrorMap<${paramName}> {\n`);
-        if (validator.customValidator) validatorImplementations.push(validator.customValidator.getText());
-        validatorImplementations.push(`}\n`);
-        console.log(`${validateTypeName} (${paramName}) hasCustom=${!!validator.customValidator}`);
+        if (validator.customValidator) typesToImport.add(validator.customValidator);
+
+        typesToImport.add(validator.symbol);
+        console.log(`${validator.symbol.name} hasCustom=${!!validator.customValidator} importName=${getImportName(validator.symbol)} usageName=${getUsageName(validator.symbol)}`);
     });
+
+    // Generate import statements
+    let imports: {
+        [file: string]: Set<string>;
+    } = {};
+    typesToImport.forEach((symbol) => {
+        let decl = symbol.declarations!.find(
+            (e) => ts.isFunctionDeclaration(e) || ts.isInterfaceDeclaration(e) || ts.isTypeAliasDeclaration(e) || ts.isClassDeclaration(e) || ts.isImportSpecifier(e)
+        );
+        // if (symbol.declarations.length > 1) console.warn(`Multiple declarations for ${symbol.name} found, using first one`);
+        if (!decl) throw new Error(`Type ${symbol.name} not found`);
+
+        let importName;
+        if (ts.isImportSpecifier(decl)) {
+            importName = (decl.parent.parent.parent.moduleSpecifier as ts.StringLiteral).text;
+        } else {
+            let file = decl.getSourceFile();
+            importName = path.relative(process.cwd(), file.fileName);
+            if (importName.endsWith(".ts")) importName = importName.substring(0, importName.length - 3);
+            if (!importName.startsWith(".")) importName = "./" + importName;
+        }
+        let names = imports[importName];
+        if (!names) {
+            names = new Set<string>();
+            imports[importName] = names;
+        }
+        names.add(getImportName(symbol));
+    });
+    Object.keys(imports).forEach((importName) => {
+        let elems = imports[importName];
+        outputStream.write(`import { ${[...elems].join(", ")} } from "${importName}"\n`);
+    });
+
+    outputStream.write(endPointsTypings.join(""));
 
     // Create Client class typedefs
     outputStream.write(`
@@ -271,7 +303,7 @@ function getRouteTypes(node: ts.Node, typeChecker: ts.TypeChecker, methods: Meth
             let pathType = m[2];
             let apiType = m[3] === "Request" ? "req" : "res";
 
-            let references = new Set<ts.Node>();
+            let references = new Set<ts.Symbol>();
             resolveRecursiveTypeReferences(node, typeChecker, references);
 
             methods[method] = {
@@ -285,15 +317,11 @@ function getRouteTypes(node: ts.Node, typeChecker: ts.TypeChecker, methods: Meth
                 },
             };
 
-            references.forEach((e) => {
-                if (ts.isVariableDeclaration(e)) return;
-                let type = typeChecker.getTypeAtLocation(e);
-                if (!type || (!type.symbol && !type.aliasSymbol)) throw new Error(`Type to validate was not found. ${ts.SyntaxKind[e.kind]} ${e.getText()} `);
-                let symbol = type.aliasSymbol ?? type.symbol;
+            references.forEach((symbol) => {
                 if (validators[symbol.name]) return;
                 validators[symbol.name] = {
                     ...validators[symbol.name],
-                    paramType: e,
+                    symbol: symbol,
                 };
             });
         } else {
@@ -313,30 +341,25 @@ function getCustomValidatorTypes(node: ts.Node, typeChecker: ts.TypeChecker, out
         if (!paramType) throw new Error(`The validator '${name}' parameter type is not set.`);
         if (!ts.isTypeReferenceNode(paramType)) throw new Error(`The validator '${name}' parameter type must reference a type directly ('${paramType.getText()}' is invalid).`);
 
-        let targetTypeName = paramType.typeName.getText();
-        let type = typeChecker.getTypeAtLocation(paramType);
-        if (!type || (!type.symbol && !type.aliasSymbol)) throw new Error(`Type to validate (${targetTypeName}) was not found.`);
-        let symbol = type.aliasSymbol ?? type.symbol;
+        let symbol = typeChecker.getSymbolAtLocation(paramType.typeName);
+        if (!symbol) throw new Error(`Type to validate (${paramType.typeName.getText()}) was not found.`);
+        let customSymbol = typeChecker.getSymbolAtLocation(node.name);
+        if (!customSymbol) throw new Error(`Custom validator '${name}' not found.`);
 
-        console.log("Validator " + symbol.name);
         if (output[symbol.name]?.customValidator) throw new Error(`Duplicate validator for type ${symbol.name}`);
         output[symbol.name] = {
             ...output[symbol.name],
-            paramType: paramType,
-            customValidator: node,
+            symbol: symbol,
+            customValidator: customSymbol,
         };
 
-        let references = new Set<ts.Node>();
+        let references = new Set<ts.Symbol>();
         resolveRecursiveTypeReferences(paramType, typeChecker, references);
-        references.forEach((e) => {
-            if (ts.isVariableDeclaration(e)) return;
-            let type = typeChecker.getTypeAtLocation(e);
-            if (!type || (!type.symbol && !type.aliasSymbol)) throw new Error(`Type to validate was not found. ${e.getText()}`);
-            let symbol = type.aliasSymbol ?? type.symbol;
+        references.forEach((symbol) => {
             if (output[symbol.name]) return;
             output[symbol.name] = {
                 ...output[symbol.name],
-                paramType: e,
+                symbol: symbol,
             };
         });
     } else {
@@ -344,7 +367,7 @@ function getCustomValidatorTypes(node: ts.Node, typeChecker: ts.TypeChecker, out
     }
 }
 
-function generateFromSourceFile(program: ts.Program, file: ts.SourceFile, types: Set<ts.Node>, methodTypes: Methods, validatorTypes: Validators) {
+function generateFromSourceFile(program: ts.Program, file: ts.SourceFile, methodTypes: Methods, validatorTypes: Validators) {
     let checker = program.getTypeChecker();
     file.statements.forEach((stmt) => {
         if (ts.isModuleDeclaration(stmt)) {
@@ -357,37 +380,8 @@ function generateFromSourceFile(program: ts.Program, file: ts.SourceFile, types:
             } else {
                 throw new Error(`Unsupported namespace '${stmt.name.text}', expected 'Validation' or 'Routes'`);
             }
-        } else if (ts.isImportDeclaration(stmt)) {
-            // if (!stmt.importClause) throw new Error("Import clause is required");
-            // if (stmt.importClause!.isTypeOnly) {
-            //     // 'import type {} from "" -> Only copy types
-            //     console.log("Importing types from " + stmt.moduleSpecifier.getText());
-            //     if (stmt.importClause!.name || !stmt.importClause.namedBindings || !ts.isNamedImports(stmt.importClause.namedBindings))
-            //         throw new Error("Only named imports are supported.");
-            //     let imports = stmt.importClause.namedBindings;
-            //     imports.elements.forEach((imprt) => resolveRecursiveTypeReferences(imprt, checker, types));
-            // } else {
-            //     // 'import {} from ""' -> Add library reference
-            //     console.log("Importing from " + stmt.moduleSpecifier.getText());
-            //     throw new Error("Non-type import not yet supported");
-            //     // let from = stmt.moduleSpecifier.getText();
-            //     // if (from.startsWith("./")) {
-            //     // } else {
-            //     //     // Add lib to package.json
-            //     // }
-            // }
-        } else {
-            if (ts.isInterfaceDeclaration(stmt)) console.log("Resolving types for", stmt.name.text);
-            types.add(stmt);
-            resolveRecursiveTypeReferences(stmt, checker, types);
         }
     });
-
-    // console.log("Type count: " + types.size);
-    // types.forEach((e) => console.log(e.getText()));
-    // Object.keys(validatorTypes).forEach((typeName) => {
-    //     console.log("Validate " + typeName);
-    // });
 }
 
 function main() {
@@ -399,8 +393,8 @@ function main() {
     }
     console.log("Reading routes from ", routeDefinitionsPath);
 
-    let destinationPackagePath = "example/shared";
-    fs.mkdirSync(destinationPackagePath, { recursive: true });
+    // let destinationPackagePath = "example/shared";
+    // fs.mkdirSync(destinationPackagePath, { recursive: true });
 
     let configFileName = ts.findConfigFile(routeDefinitionsPath, ts.sys.fileExists, "tsconfig.json");
     if (!configFileName) {
@@ -411,18 +405,17 @@ function main() {
 
     let program = ts.createProgram([routeDefinitionsPath], config);
 
-    let types = new Set<ts.Node>();
     let validatorTypes: Validators = {};
     let methodTypes: Methods = {};
     // files.forEach((file) => generateFromSourceFile(program, program.getSourceFile(file)!, types, methodTypes, validatorTypes));
     let sourceFile = program.getSourceFile(routeDefinitionsPath)!;
-    generateFromSourceFile(program, sourceFile, types, methodTypes, validatorTypes);
+    generateFromSourceFile(program, sourceFile, methodTypes, validatorTypes);
 
-    let output = fs.createWriteStream(path.join(destinationPackagePath, "index.ts"));
-    generatePackageContent(types, validatorTypes, methodTypes, output);
+    let output = fs.createWriteStream("output.ts");
+    generatePackageContent(program.getTypeChecker(), validatorTypes, methodTypes, output);
     output.close();
 
-    updatePackage(destinationPackagePath);
+    // updatePackage(destinationPackagePath);
 }
 
 main();
