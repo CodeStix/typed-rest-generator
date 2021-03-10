@@ -12,14 +12,10 @@ type Validators = {
     };
 };
 
-export type Method = "get" | "post" | "put" | "delete" | "patch" | "options" | "head";
-
-export type Output = {
-    methods: Methods;
-};
+export type Method = "get" | "post" | "put" | "delete" | "patch" | "options" | "head" | "all";
 
 export type Methods = {
-    [M in Method]?: PathTypes;
+    [M in Method]: PathTypes;
 };
 
 export type PathTypes = {
@@ -28,11 +24,13 @@ export type PathTypes = {
 
 export type EndPoint = {
     req?: {
-        type: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration;
+        // type: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration;
+        symbol: ts.Symbol;
         deepReferences: Set<ts.Symbol>;
     };
     res?: {
-        type: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration;
+        // type: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration;
+        symbol: ts.Symbol;
         deepReferences: Set<ts.Symbol>;
     };
 };
@@ -113,7 +111,7 @@ function updatePackage(destinationPackagePath: string) {
 }
 
 function getDefaultTypes() {
-    let defaultTypesPath = path.join(__dirname, "types.d.ts");
+    let defaultTypesPath = path.join(__dirname, "types.ts.txt");
     return fs.readFileSync(defaultTypesPath, "utf8");
 }
 
@@ -178,14 +176,19 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
             let path = typeNameToPath(pathTypeName);
             console.log(`${pathTypeName} --> ${path}`);
 
-            let reqType = endpoint.req?.type.name?.text;
-            let resType = endpoint.res?.type.name?.text;
+            // let reqType = endpoint.req?.type.name?.text;
+            // let resType = endpoint.res?.type.name?.text;
+            let reqType = endpoint.req ? getUsageName(endpoint.req?.symbol) : null;
+            let resType = endpoint.res ? getUsageName(endpoint.res?.symbol) : null;
 
-            clientClassMethodImplementations.push(`async ${method}${pathTypeName} (${reqType ? "data: Routes." + reqType : ""}): Promise<Routes.${resType ?? "void"}> {
-                return await this.fetch("${method}", "${path}", data);
+            clientClassMethodImplementations.push(`async ${method}${pathTypeName} (${reqType ? "data: " + reqType : ""}): Promise<${resType ?? "void"}> {
+                ${resType ? "return " : ""}await this.fetch("${method}", "${path}", data);
             }`);
 
-            endPointsTypings.push(`\t\t"${path}": Endpoint<${reqType ? "Routes." + reqType : "unknown"}, ${resType ? "Routes." + reqType : "unknown"}>;\n`);
+            endPointsTypings.push(`\t\t"${path}": {
+                req: ${reqType ? reqType : "never"},
+                res: ${resType ? resType : "never"},
+            },\n`);
         });
 
         endPointsTypings.push(`\t},\n`);
@@ -233,10 +236,12 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
         outputStream.write(`import { ${[...elems].join(", ")} } from "${importName}"\n`);
     });
 
-    outputStream.write(endPointsTypings.join(""));
+    // outputStream.write(endPointsTypings.join(""));
 
     // Create Client class typedefs
     outputStream.write(`
+
+${endPointsTypings.join("")}
 
 export async function defaultFetcher(url: any, method: any, body: any) {
     let res = await fetch(url, {
@@ -247,15 +252,11 @@ export async function defaultFetcher(url: any, method: any, body: any) {
     if (res.status === 200) {
         return await res.json();
     } else if (res.status === 401) {
-        throw new Error(
-            \`Unauthorized. To implement authorization, override fetcher in the client settings.\`
-        );
+        throw new Error(\`Unauthorized. To implement authorization, override fetcher in the client settings.\`);
     } else if (res.status === 404 || (res.status > 200 && res.status < 300)) {
         return null;
     } else {
-        throw new Error(
-            \`Could not fetch '\${method}' (HTTP \${res.status}: \${res.statusText})\`
-        );
+        throw new Error(\`Could not fetch '\${method}' (HTTP \${res.status}: \${res.statusText})\`);
     }
 }
 
@@ -264,32 +265,30 @@ interface ClientSettings {
     fetcher?: (url: string, method: string, body?: object) => Promise<any>;
 }
 
-class Client {
+class BaseClient<Endpoints extends EndpointsConstraint> {
     public readonly settings: ClientSettings;
 
     public constructor(settings: ClientSettings = {}) {
         settings.path ||= "";
-        settings.fetcher ||= module.exports.defaultFetcher;
-        if (settings.path.endsWith("/"))
-            settings.path = settings.path.substring(
-                0,
-                settings.path.length - 1
-            );
+        settings.fetcher ||= defaultFetcher;
+        if (settings.path.endsWith("/")) settings.path = settings.path.substring(0, settings.path.length - 1);
         this.settings = settings;
     }
 
-    public fetch<Method extends keyof Endpoints, Path extends MethodPath<Method>>(
+    public fetch<Method extends keyof EndpointsConstraint, Path extends keyof Endpoints[Method]>(
         method: Method,
         path: Path,
-        body?: Endpoints[Method][Path]["req"],
-        query?: Endpoints[Method][Path]["query"]
+        body?: Endpoints[Method][Path]["req"]
     ): Promise<Endpoints[Method][Path]["res"]> {
-        return this.settings.fetcher(path, method, body);
+        return this.settings.fetcher!(path as string, method, body);
     }
-
-    ${clientClassMethodImplementations.join("\n\n")}
-    ${validatorImplementations.join("\n\n")}
 }
+
+class Client extends BaseClient<Endpoints> {
+${clientClassMethodImplementations.join("\n\n")}
+${validatorImplementations.join("\n\n")}
+}
+
     `);
 }
 
@@ -311,7 +310,7 @@ function getRouteTypes(node: ts.Node, typeChecker: ts.TypeChecker, methods: Meth
                 [pathType]: {
                     ...methods[method]?.[pathType],
                     [apiType]: {
-                        type: node,
+                        symbol: typeChecker.getSymbolAtLocation(node.name),
                         deepReferences: references,
                     },
                 },
@@ -406,7 +405,16 @@ function main() {
     let program = ts.createProgram([routeDefinitionsPath], config);
 
     let validatorTypes: Validators = {};
-    let methodTypes: Methods = {};
+    let methodTypes: Methods = {
+        post: {},
+        get: {},
+        put: {},
+        delete: {},
+        patch: {},
+        options: {},
+        head: {},
+        all: {},
+    };
     // files.forEach((file) => generateFromSourceFile(program, program.getSourceFile(file)!, types, methodTypes, validatorTypes));
     let sourceFile = program.getSourceFile(routeDefinitionsPath)!;
     generateFromSourceFile(program, sourceFile, methodTypes, validatorTypes);

@@ -1,0 +1,55 @@
+export type Endpoints = {
+    post: {}; // Here generate pls
+    get: {};
+    put: {};
+    delete: {};
+    patch: {};
+    options: {};
+    head: {};
+    all: {};
+};
+
+export async function defaultFetcher(url: any, method: any, body: any) {
+    let res = await fetch(url, {
+        method,
+        body: typeof body === "object" ? JSON.stringify(body) : null,
+        headers: { "Content-Type": "application/json" },
+    });
+    if (res.status === 200) {
+        return await res.json();
+    } else if (res.status === 401) {
+        throw new Error(`Unauthorized. To implement authorization, override fetcher in the client settings.`);
+    } else if (res.status === 404 || (res.status > 200 && res.status < 300)) {
+        return null;
+    } else {
+        throw new Error(`Could not fetch '${method}' (HTTP ${res.status}: ${res.statusText})`);
+    }
+}
+
+interface ClientSettings {
+    path?: string;
+    fetcher?: (url: string, method: string, body?: object) => Promise<any>;
+}
+
+class BaseClient<Endpoints extends EndpointsConstraint> {
+    public readonly settings: ClientSettings;
+
+    public constructor(settings: ClientSettings = {}) {
+        settings.path ||= "";
+        settings.fetcher ||= defaultFetcher;
+        if (settings.path.endsWith("/")) settings.path = settings.path.substring(0, settings.path.length - 1);
+        this.settings = settings;
+    }
+
+    public fetch<Method extends keyof EndpointsConstraint, Path extends keyof Endpoints[Method]>(
+        method: Method,
+        path: Path,
+        body?: Endpoints[Method][Path]["req"]
+    ): Promise<Endpoints[Method][Path]["res"]> {
+        return this.settings.fetcher!(path as string, method, body);
+    }
+}
+
+class Client extends BaseClient<Endpoints> {
+    // Here generate pls
+}
