@@ -15,7 +15,7 @@ function App() {
                     let resp = await client.postUser({
                         user: {
                             birthDate: new Date(),
-                            email: "reddusted@gmail.com",
+                            email: prompt() as any,
                             gender: "male",
                             id: 123,
                             password: "asdf",

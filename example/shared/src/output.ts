@@ -43,23 +43,33 @@ declare module "express-serve-static-core" {
         ): T;
     }
 }
-import { Routes, User, Gender, Validation } from "./index";
+import { Routes, User, Gender, Validation } from "./index"
+
 
 export type Endpoints = {
-    post: {
-        "/user": {
-            req: Routes.PostUserRequest;
-            res: Routes.PostUserResponse;
-        };
-    };
-    get: {};
-    put: {};
-    delete: {};
-    patch: {};
-    options: {};
-    head: {};
-    all: {};
-};
+	post: {
+		"/user": {
+                req: Routes.PostUserRequest,
+                res: Routes.PostUserResponse,
+            },
+	},
+	get: {
+	},
+	put: {
+	},
+	delete: {
+	},
+	patch: {
+	},
+	options: {
+	},
+	head: {
+	},
+	all: {
+	},
+}
+
+
 
 export async function defaultFetcher(url: any, method: any, body: any) {
     let res = await fetch(url, {
@@ -103,63 +113,76 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
 }
 
 export class Client extends BaseClient<Endpoints> {
-    public async postUser(data: Routes.PostUserRequest): Promise<Routes.PostUserResponse> {
-        return await this.fetch("post", "/user", data);
-    }
+public async postUser (data: Routes.PostUserRequest): Promise<Routes.PostUserResponse> {
+                return await this.fetch("post", "/user", data);
+            }
 }
 
 export const SCHEMAS = {
-    User: {
-        type: "isObject",
-        schema: {
-            id: {
-                type: "isType",
-                value: "number",
+    "User": {
+        "type": "isObject",
+        "schema": {
+            "id": {
+                "type": "isType",
+                "value": "number"
             },
-            email: {
-                type: "isType",
-                value: "string",
+            "email": {
+                "type": "isType",
+                "value": "string"
             },
-            password: {
-                type: "isType",
-                value: "string",
+            "password": {
+                "type": "isType",
+                "value": "string"
             },
-            birthDate: {
-                type: "ref",
-                value: "Date",
+            "birthDate": {
+                "type": "ref",
+                "value": "Date"
             },
-            gender: {
-                type: "ref",
-                value: "Gender",
-            },
-        },
+            "gender": {
+                "type": "ref",
+                "value": "Gender"
+            }
+        }
     },
-    Gender: {
-        type: "unknown",
+    "Gender": {
+        "type": "true"
     },
-    RoutesPostUserRequest: {
-        type: "and",
-        schemas: [
+    "RoutesPostUserRequest": {
+        "type": "and",
+        "schemas": [
             {
-                type: "isObject",
-                schema: {
-                    user: {
-                        type: "ref",
-                        value: "User",
-                    },
-                },
+                "type": "isObject",
+                "schema": {
+                    "user": {
+                        "type": "ref",
+                        "value": "User"
+                    }
+                }
             },
             {
-                type: "function",
-                name: "Validation.validatePostPostRequest",
-            },
-        ],
+                "type": "function",
+                "name": "Validation.validatePostPostRequest"
+            }
+        ]
     },
+    "Date": {
+        "type": "and",
+        "schemas": [
+            {
+                "type": "true"
+            },
+            {
+                "type": "function",
+                "name": "Validation.validateDate"
+            }
+        ]
+    }
 } as const;
 
 export const CUSTOM_VALIDATORS = {
-    "Validation.validatePostPostRequest": Validation.validatePostPostRequest,
-};
+	"Validation.validatePostPostRequest": Validation.validatePostPostRequest,
+	"Validation.validateDate": Validation.validateDate
+}
 
 export type TypeSchema =
     | { type: "and" | "or"; schemas: readonly TypeSchema[] }
@@ -260,3 +283,4 @@ export function validate<Context>(schema: TypeSchema, value: any, context: Conte
             throw new Error("Cannot validate unknown type.");
     }
 }
+    

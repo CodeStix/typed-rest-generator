@@ -1,3 +1,5 @@
+import ts from "byots";
+
 export function decapitalize(str: string) {
     return str[0].toLowerCase() + str.substring(1);
 }
@@ -21,4 +23,28 @@ export function splitCapitalized(str: string) {
     }
     if (current.length > 0) parts.push(current);
     return parts;
+}
+
+export function getSymbolImportName(symbol: ts.Symbol): string {
+    if (!symbol.parent?.parent) return symbol.name;
+    return getSymbolImportName(symbol.parent);
+}
+
+export function getSymbolUsageName(symbol: ts.Symbol): string {
+    if (!symbol.parent?.parent) return symbol.name;
+    return getSymbolUsageName(symbol.parent) + "." + symbol.name;
+}
+
+export function getSymbolFullName(symbol: ts.Symbol): string {
+    if (!symbol.parent?.parent) return symbol.name;
+    return getSymbolUsageName(symbol.parent) + symbol.name;
+}
+
+export function getMostSuitableDeclaration(decls?: ts.Declaration[]) {
+    if (!decls) return decls;
+    return decls.find((e) => ts.isClassDeclaration(e) || ts.isFunctionDeclaration(e) || ts.isInterfaceDeclaration(e) || ts.isTypeAliasDeclaration(e) || ts.isImportSpecifier(e))!;
+}
+
+export function isDefaultType(symbol: ts.Symbol) {
+    return symbol.declarations!.some((e) => e.getSourceFile().fileName.includes("/node_modules/typescript/lib"));
 }

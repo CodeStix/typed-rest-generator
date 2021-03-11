@@ -1,7 +1,7 @@
-import ts, { getContextualTypeOrAncestorTypeNodeType, SymbolFlags } from "byots";
+import ts from "byots";
 import fs from "fs";
 import path from "path";
-import { decapitalize, splitCapitalized } from "./helpers";
+import { decapitalize, splitCapitalized, getSymbolUsageName, getMostSuitableDeclaration, getSymbolFullName, getSymbolImportName, isDefaultType } from "./helpers";
 import semver from "semver";
 import { TypeSchema, createTypeSchema } from "./validation";
 
@@ -72,6 +72,7 @@ function resolveRecursiveTypeReferences(node: ts.Node, typeChecker: ts.TypeCheck
     } else if (ts.isImportSpecifier(node)) {
         let symbol = typeChecker.getSymbolAtLocation(node.propertyName ?? node.name);
         if (!symbol) throw new Error(`Type ${node.propertyName?.getText() ?? node.name.getText()} was not found (import)`);
+        if (isDefaultType(symbol)) return;
         if (output.has(symbol)) return;
         output.add(symbol);
         symbol.declarations!.forEach((decl) => resolveRecursiveTypeReferences(decl, typeChecker, output));
@@ -125,7 +126,7 @@ function typeNameToPath(typeName: string) {
     );
 }
 
-function symbolFlagsToString(flags: SymbolFlags) {
+function symbolFlagsToString(flags: ts.SymbolFlags) {
     let str = [];
     for (let flag in ts.SymbolFlags) {
         let n = parseInt(ts.SymbolFlags[flag]);
@@ -136,35 +137,13 @@ function symbolFlagsToString(flags: SymbolFlags) {
     return str.join(", ");
 }
 
-function getImportName(symbol: ts.Symbol): string {
-    if (!symbol.parent?.parent) return symbol.name;
-    return getImportName(symbol.parent);
-}
-
-function getUsageName(symbol: ts.Symbol): string {
-    if (!symbol.parent?.parent) return symbol.name;
-    return getUsageName(symbol.parent) + "." + symbol.name;
-}
-
-function getFullName(symbol: ts.Symbol): string {
-    if (!symbol.parent?.parent) return symbol.name;
-    return getUsageName(symbol.parent) + symbol.name;
-}
-
-function getMostSuitableDeclaration(decls?: ts.Declaration[]) {
-    if (!decls) return decls;
-    return decls.find((e) => ts.isClassDeclaration(e) || ts.isFunctionDeclaration(e) || ts.isInterfaceDeclaration(e) || ts.isTypeAliasDeclaration(e) || ts.isImportSpecifier(e))!;
-}
-
-function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validators, methods: Methods, outputStream: fs.WriteStream) {
+function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validators, methods: Methods, outputStream: fs.WriteStream, currentDirectory: string) {
     // Copy default types
     outputStream.write(getDefaultTypes());
 
     let clientClassMethodImplementations: string[] = [];
-    let endPointsTypings: string[] = [];
-    // let routeTypes = new Set<ts.Node>();
-
     let typesToImport = new Set<ts.Symbol>();
+    let endPointsTypings: string[] = [];
 
     // Create Endpoints type
     endPointsTypings.push(`export type Endpoints = {\n`);
@@ -187,10 +166,8 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
             let path = typeNameToPath(pathTypeName);
             console.log(`${pathTypeName} --> ${path}`);
 
-            // let reqType = endpoint.req?.type.name?.text;
-            // let resType = endpoint.res?.type.name?.text;
-            let reqType = endpoint.req ? getUsageName(endpoint.req.symbol) : null;
-            let resType = endpoint.res ? getUsageName(endpoint.res.symbol) : null;
+            let reqType = endpoint.req ? getSymbolUsageName(endpoint.req.symbol) : null;
+            let resType = endpoint.res ? getSymbolUsageName(endpoint.res.symbol) : null;
 
             clientClassMethodImplementations.push(`public async ${method}${pathTypeName} (${reqType ? "data: " + reqType : ""}): Promise<${resType ?? "void"}> {
                 ${resType ? "return " : ""}await this.fetch("${method}", "${path}", data);
@@ -216,11 +193,11 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
         typesToImport.add(validator.symbol);
         if (validator.customValidator) typesToImport.add(validator.customValidator);
         let decl: ts.Node = getMostSuitableDeclaration(validator.symbol.declarations)!;
-        let name = getFullName(validator.symbol);
+        let name = getSymbolFullName(validator.symbol);
         if (typeSchemas[name]) throw new Error(`Duplicate validator for ${name}`);
         let impl = createTypeSchema(decl, typeChecker);
         if (validator.customValidator) {
-            let usageName = getUsageName(validator.customValidator);
+            let usageName = getSymbolUsageName(validator.customValidator);
             customValidatorNames.push(usageName);
             impl = {
                 type: "and",
@@ -235,6 +212,11 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
         [file: string]: Set<string>;
     } = {};
     typesToImport.forEach((symbol) => {
+        if (isDefaultType(symbol)) {
+            console.log("Not importing", symbol.name, "because its a default type");
+            return;
+        }
+
         let decl = getMostSuitableDeclaration(symbol.declarations);
         if (!decl) throw new Error(`Type ${symbol.name} not found`);
 
@@ -243,7 +225,7 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
             importName = (decl.parent.parent.parent.moduleSpecifier as ts.StringLiteral).text;
         } else {
             let file = decl.getSourceFile();
-            importName = path.relative(process.cwd(), file.fileName);
+            importName = path.relative(currentDirectory, file.fileName);
             if (importName.endsWith(".ts")) importName = importName.substring(0, importName.length - 3);
             if (!importName.startsWith(".")) importName = "./" + importName;
         }
@@ -252,7 +234,7 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
             names = new Set<string>();
             imports[importName] = names;
         }
-        names.add(getImportName(symbol));
+        names.add(getSymbolImportName(symbol));
     });
     Object.keys(imports).forEach((importName) => {
         let elems = imports[importName];
@@ -544,8 +526,8 @@ function main() {
     let sourceFile = program.getSourceFile(routeDefinitionsPath)!;
     generateFromSourceFile(program, sourceFile, methodTypes, validatorTypes);
 
-    let output = fs.createWriteStream("output.ts");
-    generatePackageContent(program.getTypeChecker(), validatorTypes, methodTypes, output);
+    let output = fs.createWriteStream(path.join(path.dirname(routeDefinitionsPath), "output.ts"));
+    generatePackageContent(program.getTypeChecker(), validatorTypes, methodTypes, output, path.dirname(routeDefinitionsPath));
     output.close();
 
     // updatePackage(destinationPackagePath);

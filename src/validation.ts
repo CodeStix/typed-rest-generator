@@ -1,4 +1,5 @@
 import ts from "byots";
+import { isDefaultType } from "./helpers";
 
 export type TypeSchema =
     | { type: "and" | "or"; schemas: readonly TypeSchema[] }
@@ -101,6 +102,10 @@ export function validate<Context>(schema: TypeSchema, value: any, context: Conte
 }
 
 export function createTypeSchema(node: ts.Node, checker: ts.TypeChecker): TypeSchema {
+    if (node.symbol && isDefaultType(node.symbol)) {
+        console.warn(`Encountered default type ${node.symbol.name}, this will always validate to true`);
+        return { type: "true" };
+    }
     if (node.kind === ts.SyntaxKind.AnyKeyword) {
         console.warn("Encountered any keyword, this will always validate to true.");
         return { type: "true" };
@@ -152,7 +157,7 @@ export function createTypeSchema(node: ts.Node, checker: ts.TypeChecker): TypeSc
         if (!imp || !imp.declarations || imp.declarations.length < 1) throw new Error(`Type ${node.name.text} not found.`);
         return createTypeSchema(imp.getDeclarations()![0], checker);
     } else {
-        console.log("Unknown node", ts.SyntaxKind[node.kind], node.getText());
-        return { type: "unknown" };
+        console.warn(`Unknown node, this will always validate to true (${ts.SyntaxKind[node.kind]}): ${node.getText()}`);
+        return { type: "true" };
     }
 }

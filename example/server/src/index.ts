@@ -1,6 +1,6 @@
 import express, { RequestHandler, IRouterMatcher } from "express";
 import { Post } from "@prisma/client";
-import { Routes, Validation, validate, SCHEMAS } from "shared";
+import { Routes, Validation, validate, SCHEMAS, CUSTOM_VALIDATORS } from "shared";
 import {} from "express-serve-static-core";
 
 // let client = new Client();
@@ -22,7 +22,7 @@ app.use((req, res, next) => {
 // });
 
 app.post("/user", (req, res, next) => {
-    let err = validate(SCHEMAS.RoutesPostUserRequest, req.body, {} as any, { abortEarly: false, otherSchemas: SCHEMAS });
+    let err = validate(SCHEMAS.RoutesPostUserRequest, req.body, {} as any, { abortEarly: false, otherSchemas: SCHEMAS, customValidators: CUSTOM_VALIDATORS });
     if (err) {
         console.log("user err", req.body, err);
         res.json({

@@ -35,7 +35,8 @@ export namespace Routes {
 
 export namespace Validation {
     export function validatePostPostRequest(data: Routes.PostUserRequest) {
-        console.log("custom validator got called!", JSON.stringify(data));
+        if (data.user.email.length < 5) return { user: { email: "must be longer" } };
+        return null;
     }
 
     export function validateDate(date: Date) {
