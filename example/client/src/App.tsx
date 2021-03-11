@@ -24,7 +24,7 @@ function App() {
                     ? "No users yet"
                     : users.map((e) => (
                           <li>
-                              {e.email} ({e.gender})
+                              {e.email} ({e.gender})<button onClick={async () => alert(JSON.stringify(await client.getUser({ userId: e.id })))}>More info</button>
                           </li>
                       ))}
             </ul>

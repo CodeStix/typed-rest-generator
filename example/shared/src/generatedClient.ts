@@ -6,8 +6,8 @@ import type p from "qs";
 export type EndpointsConstraint = {
     [M in "all" | "get" | "post" | "put" | "delete" | "patch" | "options" | "head"]: {
         [path: string]: {
-            req: object | never;
-            res: object | never;
+            req: any;
+            res: any;
         };
     };
 };
