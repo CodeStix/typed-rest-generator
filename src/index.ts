@@ -2,7 +2,6 @@ import ts from "byots";
 import fs from "fs";
 import path from "path";
 import { decapitalize, splitCapitalized, getSymbolUsageName, getMostSuitableDeclaration, getSymbolFullName, getSymbolImportName, isDefaultType } from "./helpers";
-import semver from "semver";
 import { TypeSchema, createTypeSchema } from "./validation";
 
 type Validators = {
@@ -74,37 +73,6 @@ function resolveRecursiveTypeReferences(node: ts.Node, typeChecker: ts.TypeCheck
         symbol.declarations!.forEach((decl) => resolveRecursiveTypeReferences(decl, typeChecker, output));
     } else {
         // console.warn(`Unsupported node ${ts.SyntaxKind[node.kind]}`);
-    }
-}
-
-function updatePackage(destinationPackagePath: string) {
-    // Create or update (increase version) package.json
-    let packageJsonPath = path.join(destinationPackagePath, "package.json");
-    let packageJson;
-    if (fs.existsSync(packageJsonPath)) {
-        packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
-        let v = semver.parse(packageJson.version)!;
-        v.patch += 1;
-        console.log("New version", v.format());
-        packageJson.version = v.format();
-    } else {
-        packageJson = {
-            name: "shared",
-            version: "1.0.0",
-            main: "index.js",
-            types: "index.d.ts",
-            license: "MIT",
-            dependencies: {
-                "@types/express-serve-static-core": "^4.17.18",
-            },
-        };
-    }
-    fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
-
-    // Create .gitignore
-    let gitignorePath = path.join(destinationPackagePath, ".gitignore");
-    if (!fs.existsSync(gitignorePath)) {
-        fs.writeFileSync(gitignorePath, "/node_modules");
     }
 }
 
@@ -494,9 +462,6 @@ function main() {
     }
     console.log("Reading routes from ", routeDefinitionsPath);
 
-    // let destinationPackagePath = "example/shared";
-    // fs.mkdirSync(destinationPackagePath, { recursive: true });
-
     let configFileName = ts.findConfigFile(routeDefinitionsPath, ts.sys.fileExists, "tsconfig.json");
     if (!configFileName) {
         throw new Error("tsconfig.json could not be found");
@@ -524,8 +489,6 @@ function main() {
     let output = fs.createWriteStream(path.join(path.dirname(routeDefinitionsPath), "output.ts"));
     generatePackageContent(program.getTypeChecker(), validatorTypes, methodTypes, output, path.dirname(routeDefinitionsPath));
     output.close();
-
-    // updatePackage(destinationPackagePath);
 }
 
 main();
