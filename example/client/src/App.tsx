@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Client, User, Routes, UserWithoutId } from "shared";
-import { FormInput, FormSelect, useForm } from "typed-react-form";
+import { Client, User, Routes, UserWithoutId, ErrorMap } from "shared";
+import { FormError, FormInput, FormSelect, useForm } from "typed-react-form";
 
 let client = new Client({ path: "http://localhost:3002/" });
 
@@ -34,13 +34,18 @@ function App() {
                 onSubmit={async (ev) => {
                     ev.preventDefault();
                     form.setState({ isSubmitting: true });
-                    await client.postUser({ user: form.values });
+                    let res = await client.postUser({ user: form.values });
+                    if (res.status === "error" && typeof res.error === "object") {
+                        form.setErrors(res.error.user as any);
+                    }
                     form.setState({ isSubmitting: false });
                 }}
             >
                 <p>Email</p>
+                <FormError form={form} name="email" />
                 <FormInput form={form} name="email" type="email" />
                 <p>Password</p>
+                <FormError form={form} name="password" />
                 <FormInput form={form} name="password" type="password" />
                 <p>Gender</p>
                 <FormSelect form={form} name="gender">

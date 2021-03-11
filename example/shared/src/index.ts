@@ -1,3 +1,5 @@
+import { ErrorType } from "./generatedClient";
+
 export const Gender: {
     male: "male";
     female: "female";
@@ -47,7 +49,7 @@ export namespace Routes {
     export type PostUserResponse =
         | {
               status: "error";
-              error: any;
+              error: ErrorType<PostUserRequest>;
           }
         | {
               status: "ok";

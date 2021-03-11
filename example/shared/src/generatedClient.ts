@@ -234,7 +234,13 @@ export interface ValidationSettings<Context> {
     abortEarly?: boolean;
 }
 
-export function validate<Context>(schema: TypeSchema, value: any, context: Context, settings: ValidationSettings<Context>): any {
+export type ErrorType<T> = string | (NonNullable<T> extends object ? ErrorMap<NonNullable<T>> : never);
+
+export type ErrorMap<T> = {
+    [Key in keyof T]: ErrorType<T>;
+};
+
+export function validate<T, Context>(schema: TypeSchema, value: T, context: Context, settings: ValidationSettings<Context>): ErrorType<T> | null {
     switch (schema.type) {
         case "isType":
             return typeof value === schema.value ? null : `must be of type ${schema.value}`;
@@ -282,7 +288,7 @@ export function validate<Context>(schema: TypeSchema, value: any, context: Conte
             return Object.keys(err).length > 0 ? err : null;
         }
         case "or": {
-            let lastError = "empty or";
+            let lastError: ErrorType<T> | null = "invalid or";
             for (let i = 0; i < schema.schemas.length; i++) {
                 let sch = schema.schemas[i];
                 lastError = validate(sch, value, context, settings);
@@ -314,4 +320,5 @@ export function validate<Context>(schema: TypeSchema, value: any, context: Conte
             throw new Error("Cannot validate unknown type.");
     }
 }
+
     
