@@ -70,4 +70,4 @@ export namespace Validation {
     }
 }
 
-export * from "./output";
+export * from "./generatedClient";

@@ -107,13 +107,15 @@ function getRouteTypes(node: ts.Node, typeChecker: ts.TypeChecker, methods: Meth
                 },
             };
 
-            references.forEach((symbol) => {
-                if (validators[symbol.name]) return;
-                validators[symbol.name] = {
-                    ...validators[symbol.name],
-                    symbol: symbol,
-                };
-            });
+            if (apiType === "req") {
+                references.forEach((symbol) => {
+                    if (validators[symbol.name]) return;
+                    validators[symbol.name] = {
+                        ...validators[symbol.name],
+                        symbol: symbol,
+                    };
+                });
+            }
         } else {
             throw new Error(`Malformed route type name '${name}', please match '${regex.source}'`);
         }
@@ -157,7 +159,7 @@ function getCustomValidatorTypes(node: ts.Node, typeChecker: ts.TypeChecker, out
     }
 }
 
-function generateFromSourceFile(program: ts.Program, file: ts.SourceFile, methodTypes: Methods, validatorTypes: Validators) {
+function getFromSourceFile(program: ts.Program, file: ts.SourceFile, methodTypes: Methods, validatorTypes: Validators) {
     let checker = program.getTypeChecker();
     file.statements.forEach((stmt) => {
         if (ts.isModuleDeclaration(stmt)) {
@@ -465,9 +467,9 @@ function main() {
     };
     // files.forEach((file) => generateFromSourceFile(program, program.getSourceFile(file)!, types, methodTypes, validatorTypes));
     let sourceFile = program.getSourceFile(routeDefinitionsPath)!;
-    generateFromSourceFile(program, sourceFile, methodTypes, validatorTypes);
+    getFromSourceFile(program, sourceFile, methodTypes, validatorTypes);
 
-    let output = fs.createWriteStream(path.join(path.dirname(routeDefinitionsPath), "output.ts"));
+    let output = fs.createWriteStream(path.join(path.dirname(routeDefinitionsPath), "generatedClient.ts"));
     generatePackageContent(program.getTypeChecker(), validatorTypes, methodTypes, output, path.dirname(routeDefinitionsPath));
     output.close();
 }

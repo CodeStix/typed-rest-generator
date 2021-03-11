@@ -43,7 +43,7 @@ declare module "express-serve-static-core" {
         ): T;
     }
 }
-import { Routes, User, Validation, Gender, UserWithoutId } from "./index"
+import { Routes, Validation, UserWithoutId, Gender } from "./index"
 
 
 export type Endpoints = {
@@ -135,18 +135,6 @@ public async getUser (data: Routes.GetUserRequest): Promise<Routes.GetUserRespon
 }
 
 export const SCHEMAS = {
-    "RoutesGetUsersResponse": {
-        "type": "isObject",
-        "schema": {
-            "users": {
-                "type": "isArray",
-                "itemSchema": {
-                    "type": "ref",
-                    "value": "User"
-                }
-            }
-        }
-    },
     "RoutesGetUserRequest": {
         "type": "isObject",
         "schema": {
@@ -156,22 +144,27 @@ export const SCHEMAS = {
             }
         }
     },
-    "RoutesGetUserResponse": {
-        "type": "isObject",
-        "schema": {
-            "user": {
-                "type": "ref",
-                "value": "User"
-            }
-        }
-    },
-    "User": {
-        "type": "isObject",
-        "schema": {
-            "id": {
-                "type": "isType",
-                "value": "number"
+    "RoutesPostUserRequest": {
+        "type": "and",
+        "schemas": [
+            {
+                "type": "isObject",
+                "schema": {
+                    "user": {
+                        "type": "ref",
+                        "value": "UserWithoutId"
+                    }
+                }
             },
+            {
+                "type": "function",
+                "name": "Validation.validatePostPostRequest"
+            }
+        ]
+    },
+    "UserWithoutId": {
+        "type": "isObject",
+        "schema": {
             "email": {
                 "type": "isType",
                 "value": "string"
@@ -213,82 +206,13 @@ export const SCHEMAS = {
                 "name": "Validation.validateGender"
             }
         ]
-    },
-    "RoutesPostUserRequest": {
-        "type": "and",
-        "schemas": [
-            {
-                "type": "isObject",
-                "schema": {
-                    "user": {
-                        "type": "ref",
-                        "value": "UserWithoutId"
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "name": "Validation.validatePostPostRequest"
-            }
-        ]
-    },
-    "UserWithoutId": {
-        "type": "isObject",
-        "schema": {
-            "email": {
-                "type": "isType",
-                "value": "string"
-            },
-            "password": {
-                "type": "isType",
-                "value": "string"
-            },
-            "birthDate": {
-                "type": "ref",
-                "value": "Date"
-            },
-            "gender": {
-                "type": "ref",
-                "value": "Gender"
-            }
-        }
-    },
-    "RoutesPostUserResponse": {
-        "type": "or",
-        "schemas": [
-            {
-                "type": "isObject",
-                "schema": {
-                    "status": {
-                        "type": "isValue",
-                        "value": "\"error\""
-                    },
-                    "error": {
-                        "type": "true"
-                    }
-                }
-            },
-            {
-                "type": "isObject",
-                "schema": {
-                    "status": {
-                        "type": "isValue",
-                        "value": "\"ok\""
-                    },
-                    "user": {
-                        "type": "ref",
-                        "value": "User"
-                    }
-                }
-            }
-        ]
     }
 } as const;
 
 export const CUSTOM_VALIDATORS = {
+	"Validation.validatePostPostRequest": Validation.validatePostPostRequest,
 	"Validation.validateDate": Validation.validateDate,
-	"Validation.validateGender": Validation.validateGender,
-	"Validation.validatePostPostRequest": Validation.validatePostPostRequest
+	"Validation.validateGender": Validation.validateGender
 }
 
 export type TypeSchema =
