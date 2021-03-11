@@ -1,4 +1,4 @@
-import ts from "byots";
+import ts, { textSpanIsEmpty } from "byots";
 import { isDefaultType } from "./helpers";
 
 export type TypeSchema =
@@ -101,9 +101,17 @@ export function validate<Context>(schema: TypeSchema, value: any, context: Conte
     }
 }
 
+// export function getAllReferencedTypes(schema: TypeSchema) {
+//     switch(schema.type) {
+//         case "ref":
+//             return [schema.value];
+//         case ""
+//     }
+// }
+
 export function createTypeSchema(node: ts.Node, checker: ts.TypeChecker): TypeSchema {
     if (node.symbol && isDefaultType(node.symbol)) {
-        console.warn(`Encountered default type ${node.symbol.name}, this will always validate to true`);
+        console.warn("Encountered default type, this will always validate to true.");
         return { type: "true" };
     }
     if (node.kind === ts.SyntaxKind.AnyKeyword) {
@@ -145,7 +153,9 @@ export function createTypeSchema(node: ts.Node, checker: ts.TypeChecker): TypeSc
     } else if (ts.isTypeAliasDeclaration(node)) {
         return createTypeSchema(node.type, checker);
     } else if (ts.isTypeReferenceNode(node)) {
-        return { type: "ref", value: node.typeName.getText() };
+        let name = node.typeName.getText();
+        if (node.typeArguments?.length ?? 0 > 0) throw new Error(`Generic types are not supported (${name})`);
+        return { type: "ref", value: name };
     } else if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node)) {
         let andOr: TypeSchema[] = [];
         node.types.forEach((type) => {

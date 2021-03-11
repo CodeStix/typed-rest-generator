@@ -43,7 +43,7 @@ declare module "express-serve-static-core" {
         ): T;
     }
 }
-import { Routes, User, Gender, Validation } from "./index"
+import { Routes, User, Validation, Gender, UserWithoutId } from "./index"
 
 
 export type Endpoints = {
@@ -54,6 +54,14 @@ export type Endpoints = {
             },
 	},
 	get: {
+		"/users": {
+                req: never,
+                res: Routes.GetUsersResponse,
+            },
+		"/user": {
+                req: Routes.GetUserRequest,
+                res: Routes.GetUserResponse,
+            },
 	},
 	put: {
 	},
@@ -116,9 +124,47 @@ export class Client extends BaseClient<Endpoints> {
 public async postUser (data: Routes.PostUserRequest): Promise<Routes.PostUserResponse> {
                 return await this.fetch("post", "/user", data);
             }
+
+public async getUsers (): Promise<Routes.GetUsersResponse> {
+                return await this.fetch("get", "/users");
+            }
+
+public async getUser (data: Routes.GetUserRequest): Promise<Routes.GetUserResponse> {
+                return await this.fetch("get", "/user", data);
+            }
 }
 
 export const SCHEMAS = {
+    "RoutesGetUsersResponse": {
+        "type": "isObject",
+        "schema": {
+            "users": {
+                "type": "isArray",
+                "itemSchema": {
+                    "type": "ref",
+                    "value": "User"
+                }
+            }
+        }
+    },
+    "RoutesGetUserRequest": {
+        "type": "isObject",
+        "schema": {
+            "userId": {
+                "type": "isType",
+                "value": "number"
+            }
+        }
+    },
+    "RoutesGetUserResponse": {
+        "type": "isObject",
+        "schema": {
+            "user": {
+                "type": "ref",
+                "value": "User"
+            }
+        }
+    },
     "User": {
         "type": "isObject",
         "schema": {
@@ -144,27 +190,6 @@ export const SCHEMAS = {
             }
         }
     },
-    "Gender": {
-        "type": "true"
-    },
-    "RoutesPostUserRequest": {
-        "type": "and",
-        "schemas": [
-            {
-                "type": "isObject",
-                "schema": {
-                    "user": {
-                        "type": "ref",
-                        "value": "User"
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "name": "Validation.validatePostPostRequest"
-            }
-        ]
-    },
     "Date": {
         "type": "and",
         "schemas": [
@@ -176,12 +201,94 @@ export const SCHEMAS = {
                 "name": "Validation.validateDate"
             }
         ]
+    },
+    "Gender": {
+        "type": "and",
+        "schemas": [
+            {
+                "type": "true"
+            },
+            {
+                "type": "function",
+                "name": "Validation.validateGender"
+            }
+        ]
+    },
+    "RoutesPostUserRequest": {
+        "type": "and",
+        "schemas": [
+            {
+                "type": "isObject",
+                "schema": {
+                    "user": {
+                        "type": "ref",
+                        "value": "UserWithoutId"
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "name": "Validation.validatePostPostRequest"
+            }
+        ]
+    },
+    "UserWithoutId": {
+        "type": "isObject",
+        "schema": {
+            "email": {
+                "type": "isType",
+                "value": "string"
+            },
+            "password": {
+                "type": "isType",
+                "value": "string"
+            },
+            "birthDate": {
+                "type": "ref",
+                "value": "Date"
+            },
+            "gender": {
+                "type": "ref",
+                "value": "Gender"
+            }
+        }
+    },
+    "RoutesPostUserResponse": {
+        "type": "or",
+        "schemas": [
+            {
+                "type": "isObject",
+                "schema": {
+                    "status": {
+                        "type": "isValue",
+                        "value": "\"error\""
+                    },
+                    "error": {
+                        "type": "true"
+                    }
+                }
+            },
+            {
+                "type": "isObject",
+                "schema": {
+                    "status": {
+                        "type": "isValue",
+                        "value": "\"ok\""
+                    },
+                    "user": {
+                        "type": "ref",
+                        "value": "User"
+                    }
+                }
+            }
+        ]
     }
 } as const;
 
 export const CUSTOM_VALIDATORS = {
-	"Validation.validatePostPostRequest": Validation.validatePostPostRequest,
-	"Validation.validateDate": Validation.validateDate
+	"Validation.validateDate": Validation.validateDate,
+	"Validation.validateGender": Validation.validateGender,
+	"Validation.validatePostPostRequest": Validation.validatePostPostRequest
 }
 
 export type TypeSchema =

@@ -38,8 +38,6 @@ export type EndPoint = {
 
 export type ApiType = keyof EndPoint;
 
-const SKIP_TYPES = ["Date", "BigInt", "Decimal"];
-
 /**
  * @param node Find out which types this node references.
  * @param typeChecker
@@ -55,8 +53,6 @@ function resolveRecursiveTypeReferences(node: ts.Node, typeChecker: ts.TypeCheck
     } else if (ts.isTypeReferenceNode(node)) {
         // Find where type is defined
         let name = node.typeName.getText();
-        if (SKIP_TYPES.includes(name)) return;
-
         let symbol = typeChecker.getSymbolAtLocation(node.typeName);
         if (!symbol) throw new Error(`Type ${name} was not found '${node.parent.parent.getText()}'`);
 
@@ -170,7 +166,7 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
             let resType = endpoint.res ? getSymbolUsageName(endpoint.res.symbol) : null;
 
             clientClassMethodImplementations.push(`public async ${method}${pathTypeName} (${reqType ? "data: " + reqType : ""}): Promise<${resType ?? "void"}> {
-                ${resType ? "return " : ""}await this.fetch("${method}", "${path}", data);
+                ${resType ? "return " : ""}await this.fetch("${method}", "${path}"${reqType ? ", data" : ""});
             }`);
 
             endPointsTypings.push(`\t\t"${path}": {
@@ -212,10 +208,8 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
         [file: string]: Set<string>;
     } = {};
     typesToImport.forEach((symbol) => {
-        if (isDefaultType(symbol)) {
-            console.log("Not importing", symbol.name, "because its a default type");
-            return;
-        }
+        // Do not import default types like Date ...
+        if (isDefaultType(symbol)) return;
 
         let decl = getMostSuitableDeclaration(symbol.declarations);
         if (!decl) throw new Error(`Type ${symbol.name} not found`);
@@ -410,6 +404,7 @@ function getRouteTypes(node: ts.Node, typeChecker: ts.TypeChecker, methods: Meth
             let apiType = m[3] === "Request" ? "req" : "res";
 
             let references = new Set<ts.Symbol>();
+            references.add(node.symbol);
             resolveRecursiveTypeReferences(node, typeChecker, references);
 
             methods[method] = {

@@ -1,7 +1,19 @@
+export const Gender: {
+    male: "male";
+    female: "female";
+} = { male: "male", female: "female" };
+
 export type Gender = typeof Gender[keyof typeof Gender];
 
 export type User = {
     id: number;
+    email: string;
+    password: string;
+    birthDate: Date;
+    gender: Gender;
+};
+
+export type UserWithoutId = {
     email: string;
     password: string;
     birthDate: Date;
@@ -15,22 +27,32 @@ export type Post = {
     userId: number;
 };
 
-export const Gender = {
-    male: "male",
-    female: "female",
-};
-
 export namespace Routes {
-    export interface PostUserRequest {
+    export interface GetUsersResponse {
+        users: User[];
+    }
+
+    export interface GetUserRequest {
+        userId: number;
+    }
+
+    export interface GetUserResponse {
         user: User;
+    }
+
+    export interface PostUserRequest {
+        user: UserWithoutId;
     }
 
     export type PostUserResponse =
         | {
               status: "error";
-              err: any;
+              error: any;
           }
-        | never;
+        | {
+              status: "ok";
+              user: User;
+          };
 }
 
 export namespace Validation {
@@ -40,8 +62,11 @@ export namespace Validation {
     }
 
     export function validateDate(date: Date) {
-        console.log("validate date", date);
         return null;
+    }
+
+    export function validateGender(gender: Gender) {
+        return ["male", "female"].includes(gender) ? null : "invalid gender";
     }
 }
 
