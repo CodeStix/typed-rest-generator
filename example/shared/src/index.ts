@@ -9,6 +9,7 @@
 // Step 5: add validation overrides from Validation namespace
 // Step 6: generate client library including validators & express types
 import { CallTracker } from "assert";
+export * from "./output";
 
 export type Gender = typeof Gender[keyof typeof Gender];
 
@@ -22,7 +23,7 @@ export type User = {
 };
 
 export type Post = {
-    id: string;
+    id: string | number;
     title: string;
     content: string;
     userId: number;

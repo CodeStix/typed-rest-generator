@@ -1,8 +1,9 @@
-import ts, { SymbolFlags } from "byots";
+import ts, { getContextualTypeOrAncestorTypeNodeType, SymbolFlags } from "byots";
 import fs from "fs";
 import path from "path";
 import { decapitalize, splitCapitalized } from "./helpers";
 import semver from "semver";
+import { TypeSchema, createTypeSchema } from "./validation";
 
 type Validators = {
     [typeName: string]: {
@@ -145,6 +146,11 @@ function getUsageName(symbol: ts.Symbol): string {
     return getUsageName(symbol.parent) + "." + symbol.name;
 }
 
+function getFullName(symbol: ts.Symbol): string {
+    if (!symbol.parent?.parent) return symbol.name;
+    return getUsageName(symbol.parent) + symbol.name;
+}
+
 function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validators, methods: Methods, outputStream: fs.WriteStream) {
     // Copy default types
     outputStream.write(getDefaultTypes());
@@ -178,10 +184,10 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
 
             // let reqType = endpoint.req?.type.name?.text;
             // let resType = endpoint.res?.type.name?.text;
-            let reqType = endpoint.req ? getUsageName(endpoint.req?.symbol) : null;
-            let resType = endpoint.res ? getUsageName(endpoint.res?.symbol) : null;
+            let reqType = endpoint.req ? getUsageName(endpoint.req.symbol) : null;
+            let resType = endpoint.res ? getUsageName(endpoint.res.symbol) : null;
 
-            clientClassMethodImplementations.push(`async ${method}${pathTypeName} (${reqType ? "data: " + reqType : ""}): Promise<${resType ?? "void"}> {
+            clientClassMethodImplementations.push(`public async ${method}${pathTypeName} (${reqType ? "data: " + reqType : ""}): Promise<${resType ?? "void"}> {
                 ${resType ? "return " : ""}await this.fetch("${method}", "${path}", data);
             }`);
 
@@ -195,13 +201,30 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
     });
     endPointsTypings.push(`}\n\n`);
 
-    let validatorImplementations: string[] = [];
+    let typeSchemas: {
+        [typeName: string]: TypeSchema;
+    } = {};
+    let customValidatorNames: string[] = [];
     Object.keys(validators).forEach((validateTypeName) => {
         let validator = validators[validateTypeName];
-        if (validator.customValidator) typesToImport.add(validator.customValidator);
-
         typesToImport.add(validator.symbol);
+        if (validator.customValidator) typesToImport.add(validator.customValidator);
         console.log(`${validator.symbol.name} hasCustom=${!!validator.customValidator} importName=${getImportName(validator.symbol)} usageName=${getUsageName(validator.symbol)}`);
+        let decl: ts.Node = validator.symbol.declarations!.find(
+            (e) => ts.isClassDeclaration(e) || ts.isInterfaceDeclaration(e) || ts.isTypeAliasDeclaration(e) || ts.isImportSpecifier(e)
+        )!;
+        let name = getFullName(validator.symbol);
+        if (typeSchemas[name]) throw new Error(`Duplicate validator for ${name}`);
+        let impl = createTypeSchema(decl, typeChecker);
+        if (validator.customValidator) {
+            let usageName = getUsageName(validator.customValidator);
+            customValidatorNames.push(usageName);
+            impl = {
+                type: "and",
+                schemas: [{ type: "function", name: usageName }, impl],
+            };
+        }
+        typeSchemas[name] = impl;
     });
 
     // Generate import statements
@@ -260,12 +283,12 @@ export async function defaultFetcher(url: any, method: any, body: any) {
     }
 }
 
-interface ClientSettings {
+export interface ClientSettings {
     path?: string;
     fetcher?: (url: string, method: string, body?: object) => Promise<any>;
 }
 
-class BaseClient<Endpoints extends EndpointsConstraint> {
+export class BaseClient<Endpoints extends EndpointsConstraint> {
     public readonly settings: ClientSettings;
 
     public constructor(settings: ClientSettings = {}) {
@@ -284,9 +307,116 @@ class BaseClient<Endpoints extends EndpointsConstraint> {
     }
 }
 
-class Client extends BaseClient<Endpoints> {
+export class Client extends BaseClient<Endpoints> {
 ${clientClassMethodImplementations.join("\n\n")}
-${validatorImplementations.join("\n\n")}
+}
+
+export const SCHEMAS: {
+    [typeName: string]: TypeSchema
+} = ${JSON.stringify(typeSchemas)};
+
+export const CUSTOM_VALIDATORS = {
+${customValidatorNames.map((e) => `\t"${e}": ${e}`).join(",\n")}
+}
+
+export type TypeSchema =
+    | { type: "and" | "or"; schemas: TypeSchema[] }
+    | { type: "ref"; value: string }
+    | { type: "function"; name: string }
+    | { type: "isType"; value: "string" | "boolean" | "number" | "object" }
+    | { type: "isValue"; value: any }
+    | { type: "isArray"; itemSchema: TypeSchema }
+    | { type: "isObject"; schema: { [key: string]: TypeSchema } }
+    | { type: "isTuple"; itemSchemas: TypeSchema[] }
+    | { type: "true" }
+    | { type: "false" }
+    | { type: "unknown" };
+
+export interface BaseValidationContext {
+    otherSchemas?: { [typeName: string]: TypeSchema };
+    customValidators?: { [typeName: string]: (value: any, context: BaseValidationContext) => any };
+    abortEarly?: boolean;
+}
+
+export function validate<Context extends BaseValidationContext>(schema: TypeSchema, value: any, context: Context): any {
+    switch (schema.type) {
+        case "isType":
+            return typeof value === schema.value ? null : \`must be of type \${schema.value}\`;
+        case "isValue":
+            return value === schema.value ? null : \`must have value \${JSON.stringify(schema.value)}\`;
+        case "isObject": {
+            if (typeof value !== "object" || !value) return "invalid object";
+            let keys = Object.keys(schema.schema);
+            let err: any = {};
+            for (let i = 0; i < keys.length; i++) {
+                let key = keys[i];
+                let res = validate(schema.schema[key], value[key], context);
+                if (res) {
+                    err[key] = res;
+                    if (context.abortEarly) return err;
+                }
+            }
+            return Object.keys(err).length > 0 ? err : null;
+        }
+        case "isArray": {
+            if (!Array.isArray(value)) return "invalid array";
+            let err: any = {};
+            for (let i = 0; i < value.length; i++) {
+                let item = value[i];
+                let res = validate(schema.itemSchema, item, context);
+                if (res) {
+                    err[i] = res;
+                    if (context.abortEarly) return err;
+                }
+            }
+            return Object.keys(err).length > 0 ? err : null;
+        }
+        case "isTuple": {
+            if (!Array.isArray(value)) return "invalid tuple";
+            if (value.length !== schema.itemSchemas.length) return "invalid tuple length";
+            let err: any = {};
+            for (let i = 0; i < schema.itemSchemas.length; i++) {
+                let item = value[i];
+                let res = validate(schema.itemSchemas[i], item, context);
+                if (res) {
+                    err[i] = res;
+                    if (context.abortEarly) return err;
+                }
+            }
+            return Object.keys(err).length > 0 ? err : null;
+        }
+        case "or": {
+            let lastError = "empty or";
+            for (let i = 0; i < schema.schemas.length; i++) {
+                let sch = schema.schemas[i];
+                lastError = validate(sch, value, context);
+                if (!lastError) return null;
+            }
+            return lastError;
+        }
+        case "and": {
+            for (let i = 0; i < schema.schemas.length; i++) {
+                let sch = schema.schemas[i];
+                let res = validate(sch, value, context);
+                if (res) return res;
+            }
+            return null;
+        }
+        case "true":
+            return null;
+        case "false":
+            return "this value may not exist";
+        case "function":
+            let fn = context.customValidators?.[schema.name];
+            if (!fn) throw new Error(\`Custom validator '\${schema.name}' not found\`);
+            return fn(value as any, context as any);
+        case "ref":
+            let sch = context.otherSchemas?.[schema.value];
+            if (!sch) throw new Error(\`Could not find validator for type '\${schema.value}'\`);
+            return validate(context.otherSchemas![schema.value], value, context);
+        case "unknown":
+            throw new Error("Cannot validate unknown type.");
+    }
 }
 
     `);
