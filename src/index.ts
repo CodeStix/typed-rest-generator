@@ -6,36 +6,28 @@ import { TypeSchema, createTypeSchema } from "./validation";
 
 type Validators = {
     [typeName: string]: {
-        // paramType: ts.Node;
         symbol: ts.Symbol;
         customValidator?: ts.Symbol;
     };
 };
-
-export type Method = "get" | "post" | "put" | "delete" | "patch" | "options" | "head" | "all";
-
-export type Methods = {
+type Method = "get" | "post" | "put" | "delete" | "patch" | "options" | "head" | "all";
+type Methods = {
     [M in Method]: PathTypes;
 };
-
-export type PathTypes = {
+type PathTypes = {
     [path: string]: EndPoint;
 };
-
-export type EndPoint = {
+type EndPoint = {
     req?: {
-        // type: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration;
         symbol: ts.Symbol;
         deepReferences: Set<ts.Symbol>;
     };
     res?: {
-        // type: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration;
         symbol: ts.Symbol;
         deepReferences: Set<ts.Symbol>;
     };
 };
-
-export type ApiType = keyof EndPoint;
+type ApiType = keyof EndPoint;
 
 /**
  * @param node Find out which types this node references.
@@ -90,15 +82,96 @@ function typeNameToPath(typeName: string) {
     );
 }
 
-function symbolFlagsToString(flags: ts.SymbolFlags) {
-    let str = [];
-    for (let flag in ts.SymbolFlags) {
-        let n = parseInt(ts.SymbolFlags[flag]);
-        if ((flags & n) === n) {
-            str.push(flag);
+function getRouteTypes(node: ts.Node, typeChecker: ts.TypeChecker, methods: Methods, validators: Validators) {
+    if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) {
+        let name = node.name.text;
+        let m;
+        let regex = /^(Get|Post|Put|Patch|Delete|Head|Options)([a-zA-Z0-9_]+)(Response|Request)$/;
+        if ((m = name.match(regex))) {
+            let method = m[1].toLowerCase() as Method;
+            let pathType = m[2];
+            let apiType = m[3] === "Request" ? "req" : "res";
+
+            let references = new Set<ts.Symbol>();
+            references.add(node.symbol);
+            resolveRecursiveTypeReferences(node, typeChecker, references);
+
+            methods[method] = {
+                ...methods[method],
+                [pathType]: {
+                    ...methods[method]?.[pathType],
+                    [apiType]: {
+                        symbol: typeChecker.getSymbolAtLocation(node.name),
+                        deepReferences: references,
+                    },
+                },
+            };
+
+            references.forEach((symbol) => {
+                if (validators[symbol.name]) return;
+                validators[symbol.name] = {
+                    ...validators[symbol.name],
+                    symbol: symbol,
+                };
+            });
+        } else {
+            throw new Error(`Malformed route type name '${name}', please match '${regex.source}'`);
         }
+    } else {
+        throw new Error(`Unsupported route type '${ts.SyntaxKind[node.kind]}' at line ${node.getSourceFile().fileName}:${node.pos}`);
     }
-    return str.join(", ");
+}
+
+function getCustomValidatorTypes(node: ts.Node, typeChecker: ts.TypeChecker, output: Validators) {
+    if (ts.isFunctionDeclaration(node)) {
+        if (!node.name) throw new Error(`Every validator function requires a name`);
+        let name = node.name.text;
+        if (node.parameters.length < 1) throw new Error(`The validator '${name}' does not have a parameter which specifies the type it validates.`);
+        let paramType = node.parameters[0].type;
+        if (!paramType) throw new Error(`The validator '${name}' parameter type is not set.`);
+        if (!ts.isTypeReferenceNode(paramType)) throw new Error(`The validator '${name}' parameter type must reference a type directly ('${paramType.getText()}' is invalid).`);
+
+        let symbol = typeChecker.getSymbolAtLocation(paramType.typeName);
+        if (!symbol) throw new Error(`Type to validate (${paramType.typeName.getText()}) was not found.`);
+        let customSymbol = typeChecker.getSymbolAtLocation(node.name);
+        if (!customSymbol) throw new Error(`Custom validator '${name}' not found.`);
+
+        if (output[symbol.name]?.customValidator) throw new Error(`Duplicate validator for type ${symbol.name}`);
+        output[symbol.name] = {
+            ...output[symbol.name],
+            symbol: symbol,
+            customValidator: customSymbol,
+        };
+
+        let references = new Set<ts.Symbol>();
+        resolveRecursiveTypeReferences(paramType, typeChecker, references);
+        references.forEach((symbol) => {
+            if (output[symbol.name]) return;
+            output[symbol.name] = {
+                ...output[symbol.name],
+                symbol: symbol,
+            };
+        });
+    } else {
+        throw new Error(`Unsupported validator type '${ts.SyntaxKind[node.kind]}' at line ${node.getSourceFile().fileName}:${node.pos}`);
+    }
+}
+
+function generateFromSourceFile(program: ts.Program, file: ts.SourceFile, methodTypes: Methods, validatorTypes: Validators) {
+    let checker = program.getTypeChecker();
+    file.statements.forEach((stmt) => {
+        if (ts.isModuleDeclaration(stmt)) {
+            if (stmt.name.text === "Validation") {
+                let body = stmt.body! as ts.ModuleBlock;
+                body.statements.forEach((validateFunc) => getCustomValidatorTypes(validateFunc, checker, validatorTypes));
+            } else if (stmt.name.text === "Routes") {
+                let body = stmt.body! as ts.ModuleBlock;
+                body.statements.forEach((routeType) => getRouteTypes(routeType, checker, methodTypes, validatorTypes));
+            } else {
+                throw new Error(`Unsupported namespace '${stmt.name.text}', expected 'Validation' or 'Routes'`);
+            }
+        }
+    });
 }
 
 function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validators, methods: Methods, outputStream: fs.WriteStream, currentDirectory: string) {
@@ -359,98 +432,6 @@ export function validate<Context>(schema: TypeSchema, value: any, context: Conte
     }
 }
     `);
-}
-
-function getRouteTypes(node: ts.Node, typeChecker: ts.TypeChecker, methods: Methods, validators: Validators) {
-    if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) {
-        let name = node.name.text;
-        let m;
-        let regex = /^(Get|Post|Put|Patch|Delete|Head|Options)([a-zA-Z0-9_]+)(Response|Request)$/;
-        if ((m = name.match(regex))) {
-            let method = m[1].toLowerCase() as Method;
-            let pathType = m[2];
-            let apiType = m[3] === "Request" ? "req" : "res";
-
-            let references = new Set<ts.Symbol>();
-            references.add(node.symbol);
-            resolveRecursiveTypeReferences(node, typeChecker, references);
-
-            methods[method] = {
-                ...methods[method],
-                [pathType]: {
-                    ...methods[method]?.[pathType],
-                    [apiType]: {
-                        symbol: typeChecker.getSymbolAtLocation(node.name),
-                        deepReferences: references,
-                    },
-                },
-            };
-
-            references.forEach((symbol) => {
-                if (validators[symbol.name]) return;
-                validators[symbol.name] = {
-                    ...validators[symbol.name],
-                    symbol: symbol,
-                };
-            });
-        } else {
-            throw new Error(`Malformed route type name '${name}', please match '${regex.source}'`);
-        }
-    } else {
-        throw new Error(`Unsupported route type '${ts.SyntaxKind[node.kind]}' at line ${node.getSourceFile().fileName}:${node.pos}`);
-    }
-}
-
-function getCustomValidatorTypes(node: ts.Node, typeChecker: ts.TypeChecker, output: Validators) {
-    if (ts.isFunctionDeclaration(node)) {
-        if (!node.name) throw new Error(`Every validator function requires a name`);
-        let name = node.name.text;
-        if (node.parameters.length < 1) throw new Error(`The validator '${name}' does not have a parameter which specifies the type it validates.`);
-        let paramType = node.parameters[0].type;
-        if (!paramType) throw new Error(`The validator '${name}' parameter type is not set.`);
-        if (!ts.isTypeReferenceNode(paramType)) throw new Error(`The validator '${name}' parameter type must reference a type directly ('${paramType.getText()}' is invalid).`);
-
-        let symbol = typeChecker.getSymbolAtLocation(paramType.typeName);
-        if (!symbol) throw new Error(`Type to validate (${paramType.typeName.getText()}) was not found.`);
-        let customSymbol = typeChecker.getSymbolAtLocation(node.name);
-        if (!customSymbol) throw new Error(`Custom validator '${name}' not found.`);
-
-        if (output[symbol.name]?.customValidator) throw new Error(`Duplicate validator for type ${symbol.name}`);
-        output[symbol.name] = {
-            ...output[symbol.name],
-            symbol: symbol,
-            customValidator: customSymbol,
-        };
-
-        let references = new Set<ts.Symbol>();
-        resolveRecursiveTypeReferences(paramType, typeChecker, references);
-        references.forEach((symbol) => {
-            if (output[symbol.name]) return;
-            output[symbol.name] = {
-                ...output[symbol.name],
-                symbol: symbol,
-            };
-        });
-    } else {
-        throw new Error(`Unsupported validator type '${ts.SyntaxKind[node.kind]}' at line ${node.getSourceFile().fileName}:${node.pos}`);
-    }
-}
-
-function generateFromSourceFile(program: ts.Program, file: ts.SourceFile, methodTypes: Methods, validatorTypes: Validators) {
-    let checker = program.getTypeChecker();
-    file.statements.forEach((stmt) => {
-        if (ts.isModuleDeclaration(stmt)) {
-            if (stmt.name.text === "Validation") {
-                let body = stmt.body! as ts.ModuleBlock;
-                body.statements.forEach((validateFunc) => getCustomValidatorTypes(validateFunc, checker, validatorTypes));
-            } else if (stmt.name.text === "Routes") {
-                let body = stmt.body! as ts.ModuleBlock;
-                body.statements.forEach((routeType) => getRouteTypes(routeType, checker, methodTypes, validatorTypes));
-            } else {
-                throw new Error(`Unsupported namespace '${stmt.name.text}', expected 'Validation' or 'Routes'`);
-            }
-        }
-    });
 }
 
 function main() {

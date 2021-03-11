@@ -48,3 +48,14 @@ export function getMostSuitableDeclaration(decls?: ts.Declaration[]) {
 export function isDefaultType(symbol: ts.Symbol) {
     return symbol.declarations!.some((e) => e.getSourceFile().fileName.includes("/node_modules/typescript/lib"));
 }
+
+export function symbolFlagsToString(flags: ts.SymbolFlags) {
+    let str = [];
+    for (let flag in ts.SymbolFlags) {
+        let n = parseInt(ts.SymbolFlags[flag]);
+        if ((flags & n) === n) {
+            str.push(flag);
+        }
+    }
+    return str.join(", ");
+}
