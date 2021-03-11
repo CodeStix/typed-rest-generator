@@ -6,7 +6,8 @@
   "license": "MIT",
   "scripts": {
     "routes": "ts-node ../../src/index.ts src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "start": "tsc --watch"
   },
   "dependencies": {
     "@types/express-serve-static-core": "^4.17.18",

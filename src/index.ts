@@ -151,6 +151,11 @@ function getFullName(symbol: ts.Symbol): string {
     return getUsageName(symbol.parent) + symbol.name;
 }
 
+function getMostSuitableDeclaration(decls?: ts.Declaration[]) {
+    if (!decls) return decls;
+    return decls.find((e) => ts.isClassDeclaration(e) || ts.isFunctionDeclaration(e) || ts.isInterfaceDeclaration(e) || ts.isTypeAliasDeclaration(e) || ts.isImportSpecifier(e))!;
+}
+
 function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validators, methods: Methods, outputStream: fs.WriteStream) {
     // Copy default types
     outputStream.write(getDefaultTypes());
@@ -175,8 +180,8 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
                 let node = endpoint[apiType as ApiType];
                 if (!node) return;
 
-                // routeTypes.add(node.type);
-                node.deepReferences.forEach((e) => typesToImport.add(e));
+                typesToImport.add(node.symbol);
+                // node.deepReferences.forEach((e) => typesToImport.add(e));
             });
 
             let path = typeNameToPath(pathTypeName);
@@ -201,6 +206,7 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
     });
     endPointsTypings.push(`}\n\n`);
 
+    // Generate validation schemas
     let typeSchemas: {
         [typeName: string]: TypeSchema;
     } = {};
@@ -209,10 +215,7 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
         let validator = validators[validateTypeName];
         typesToImport.add(validator.symbol);
         if (validator.customValidator) typesToImport.add(validator.customValidator);
-        console.log(`${validator.symbol.name} hasCustom=${!!validator.customValidator} importName=${getImportName(validator.symbol)} usageName=${getUsageName(validator.symbol)}`);
-        let decl: ts.Node = validator.symbol.declarations!.find(
-            (e) => ts.isClassDeclaration(e) || ts.isInterfaceDeclaration(e) || ts.isTypeAliasDeclaration(e) || ts.isImportSpecifier(e)
-        )!;
+        let decl: ts.Node = getMostSuitableDeclaration(validator.symbol.declarations)!;
         let name = getFullName(validator.symbol);
         if (typeSchemas[name]) throw new Error(`Duplicate validator for ${name}`);
         let impl = createTypeSchema(decl, typeChecker);
@@ -221,7 +224,7 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
             customValidatorNames.push(usageName);
             impl = {
                 type: "and",
-                schemas: [{ type: "function", name: usageName }, impl],
+                schemas: [impl, { type: "function", name: usageName }],
             };
         }
         typeSchemas[name] = impl;
@@ -232,10 +235,7 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
         [file: string]: Set<string>;
     } = {};
     typesToImport.forEach((symbol) => {
-        let decl = symbol.declarations!.find(
-            (e) => ts.isFunctionDeclaration(e) || ts.isInterfaceDeclaration(e) || ts.isTypeAliasDeclaration(e) || ts.isClassDeclaration(e) || ts.isImportSpecifier(e)
-        );
-        // if (symbol.declarations.length > 1) console.warn(`Multiple declarations for ${symbol.name} found, using first one`);
+        let decl = getMostSuitableDeclaration(symbol.declarations);
         if (!decl) throw new Error(`Type ${symbol.name} not found`);
 
         let importName;
@@ -258,8 +258,6 @@ function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validat
         let elems = imports[importName];
         outputStream.write(`import { ${[...elems].join(", ")} } from "${importName}"\n`);
     });
-
-    // outputStream.write(endPointsTypings.join(""));
 
     // Create Client class typedefs
     outputStream.write(`
@@ -303,7 +301,7 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
         path: Path,
         body?: Endpoints[Method][Path]["req"]
     ): Promise<Endpoints[Method][Path]["res"]> {
-        return this.settings.fetcher!(path as string, method, body);
+        return this.settings.fetcher!(this.settings.path! + (path as string), method, body);
     }
 }
 
@@ -311,34 +309,32 @@ export class Client extends BaseClient<Endpoints> {
 ${clientClassMethodImplementations.join("\n\n")}
 }
 
-export const SCHEMAS: {
-    [typeName: string]: TypeSchema
-} = ${JSON.stringify(typeSchemas)};
+export const SCHEMAS = ${JSON.stringify(typeSchemas, null, 4)} as const;
 
 export const CUSTOM_VALIDATORS = {
 ${customValidatorNames.map((e) => `\t"${e}": ${e}`).join(",\n")}
 }
 
 export type TypeSchema =
-    | { type: "and" | "or"; schemas: TypeSchema[] }
+    | { type: "and" | "or"; schemas: readonly TypeSchema[] }
     | { type: "ref"; value: string }
     | { type: "function"; name: string }
     | { type: "isType"; value: "string" | "boolean" | "number" | "object" }
     | { type: "isValue"; value: any }
     | { type: "isArray"; itemSchema: TypeSchema }
     | { type: "isObject"; schema: { [key: string]: TypeSchema } }
-    | { type: "isTuple"; itemSchemas: TypeSchema[] }
+    | { type: "isTuple"; itemSchemas: readonly TypeSchema[] }
     | { type: "true" }
     | { type: "false" }
     | { type: "unknown" };
 
-export interface BaseValidationContext {
+export interface ValidationSettings<Context> {
     otherSchemas?: { [typeName: string]: TypeSchema };
-    customValidators?: { [typeName: string]: (value: any, context: BaseValidationContext) => any };
+    customValidators?: { [typeName: string]: (value: any, context: Context, settings: ValidationSettings<Context>) => any };
     abortEarly?: boolean;
 }
 
-export function validate<Context extends BaseValidationContext>(schema: TypeSchema, value: any, context: Context): any {
+export function validate<Context>(schema: TypeSchema, value: any, context: Context, settings: ValidationSettings<Context>): any {
     switch (schema.type) {
         case "isType":
             return typeof value === schema.value ? null : \`must be of type \${schema.value}\`;
@@ -350,10 +346,10 @@ export function validate<Context extends BaseValidationContext>(schema: TypeSche
             let err: any = {};
             for (let i = 0; i < keys.length; i++) {
                 let key = keys[i];
-                let res = validate(schema.schema[key], value[key], context);
+                let res = validate(schema.schema[key], (value as any)[key], context, settings);
                 if (res) {
                     err[key] = res;
-                    if (context.abortEarly) return err;
+                    if (settings.abortEarly) return err;
                 }
             }
             return Object.keys(err).length > 0 ? err : null;
@@ -363,10 +359,10 @@ export function validate<Context extends BaseValidationContext>(schema: TypeSche
             let err: any = {};
             for (let i = 0; i < value.length; i++) {
                 let item = value[i];
-                let res = validate(schema.itemSchema, item, context);
+                let res = validate(schema.itemSchema, item, context, settings);
                 if (res) {
                     err[i] = res;
-                    if (context.abortEarly) return err;
+                    if (settings.abortEarly) return err;
                 }
             }
             return Object.keys(err).length > 0 ? err : null;
@@ -377,10 +373,10 @@ export function validate<Context extends BaseValidationContext>(schema: TypeSche
             let err: any = {};
             for (let i = 0; i < schema.itemSchemas.length; i++) {
                 let item = value[i];
-                let res = validate(schema.itemSchemas[i], item, context);
+                let res = validate(schema.itemSchemas[i], item, context, settings);
                 if (res) {
                     err[i] = res;
-                    if (context.abortEarly) return err;
+                    if (settings.abortEarly) return err;
                 }
             }
             return Object.keys(err).length > 0 ? err : null;
@@ -389,7 +385,7 @@ export function validate<Context extends BaseValidationContext>(schema: TypeSche
             let lastError = "empty or";
             for (let i = 0; i < schema.schemas.length; i++) {
                 let sch = schema.schemas[i];
-                lastError = validate(sch, value, context);
+                lastError = validate(sch, value, context, settings);
                 if (!lastError) return null;
             }
             return lastError;
@@ -397,7 +393,7 @@ export function validate<Context extends BaseValidationContext>(schema: TypeSche
         case "and": {
             for (let i = 0; i < schema.schemas.length; i++) {
                 let sch = schema.schemas[i];
-                let res = validate(sch, value, context);
+                let res = validate(sch, value, context, settings);
                 if (res) return res;
             }
             return null;
@@ -407,18 +403,17 @@ export function validate<Context extends BaseValidationContext>(schema: TypeSche
         case "false":
             return "this value may not exist";
         case "function":
-            let fn = context.customValidators?.[schema.name];
+            let fn = settings.customValidators?.[schema.name];
             if (!fn) throw new Error(\`Custom validator '\${schema.name}' not found\`);
-            return fn(value as any, context as any);
+            return fn(value, context, settings);
         case "ref":
-            let sch = context.otherSchemas?.[schema.value];
+            let sch = settings.otherSchemas?.[schema.value];
             if (!sch) throw new Error(\`Could not find validator for type '\${schema.value}'\`);
-            return validate(context.otherSchemas![schema.value], value, context);
+            return validate(settings.otherSchemas![schema.value], value, context, settings);
         case "unknown":
             throw new Error("Cannot validate unknown type.");
     }
 }
-
     `);
 }
 
@@ -529,10 +524,10 @@ function main() {
     if (!configFileName) {
         throw new Error("tsconfig.json could not be found");
     }
-    let configFile = ts.readConfigFile(configFileName, ts.sys.readFile);
-    let config = ts.parseJsonConfigFileContent(configFile.config, ts.sys, "./").options;
+    let compilerOptionsFile = ts.readConfigFile(configFileName, ts.sys.readFile);
+    let compilerOptions = ts.parseJsonConfigFileContent(compilerOptionsFile.config, ts.sys, "./").options;
 
-    let program = ts.createProgram([routeDefinitionsPath], config);
+    let program = ts.createProgram([routeDefinitionsPath], compilerOptions);
 
     let validatorTypes: Validators = {};
     let methodTypes: Methods = {

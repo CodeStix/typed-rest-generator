@@ -1,25 +1,25 @@
 import ts from "byots";
 
 export type TypeSchema =
-    | { type: "and" | "or"; schemas: TypeSchema[] }
+    | { type: "and" | "or"; schemas: readonly TypeSchema[] }
     | { type: "ref"; value: string }
     | { type: "function"; name: string }
     | { type: "isType"; value: "string" | "boolean" | "number" | "object" }
     | { type: "isValue"; value: any }
     | { type: "isArray"; itemSchema: TypeSchema }
     | { type: "isObject"; schema: { [key: string]: TypeSchema } }
-    | { type: "isTuple"; itemSchemas: TypeSchema[] }
+    | { type: "isTuple"; itemSchemas: readonly TypeSchema[] }
     | { type: "true" }
     | { type: "false" }
     | { type: "unknown" };
 
-export interface ValidationContext {
+export interface ValidationSettings<Context> {
     otherSchemas?: { [typeName: string]: TypeSchema };
-    customValidators?: { [typeName: string]: (value: any, context: ValidationContext) => any };
+    customValidators?: { [typeName: string]: (value: any, context: Context, settings: ValidationSettings<Context>) => any };
     abortEarly?: boolean;
 }
 
-export function validate<Context extends ValidationContext>(schema: TypeSchema, value: any, context: Context): any {
+export function validate<Context>(schema: TypeSchema, value: any, context: Context, settings: ValidationSettings<Context>): any {
     switch (schema.type) {
         case "isType":
             return typeof value === schema.value ? null : `must be of type ${schema.value}`;
@@ -31,10 +31,10 @@ export function validate<Context extends ValidationContext>(schema: TypeSchema, 
             let err: any = {};
             for (let i = 0; i < keys.length; i++) {
                 let key = keys[i];
-                let res = validate(schema.schema[key], value[key], context);
+                let res = validate(schema.schema[key], (value as any)[key], context, settings);
                 if (res) {
                     err[key] = res;
-                    if (context.abortEarly) return err;
+                    if (settings.abortEarly) return err;
                 }
             }
             return Object.keys(err).length > 0 ? err : null;
@@ -44,10 +44,10 @@ export function validate<Context extends ValidationContext>(schema: TypeSchema, 
             let err: any = {};
             for (let i = 0; i < value.length; i++) {
                 let item = value[i];
-                let res = validate(schema.itemSchema, item, context);
+                let res = validate(schema.itemSchema, item, context, settings);
                 if (res) {
                     err[i] = res;
-                    if (context.abortEarly) return err;
+                    if (settings.abortEarly) return err;
                 }
             }
             return Object.keys(err).length > 0 ? err : null;
@@ -58,10 +58,10 @@ export function validate<Context extends ValidationContext>(schema: TypeSchema, 
             let err: any = {};
             for (let i = 0; i < schema.itemSchemas.length; i++) {
                 let item = value[i];
-                let res = validate(schema.itemSchemas[i], item, context);
+                let res = validate(schema.itemSchemas[i], item, context, settings);
                 if (res) {
                     err[i] = res;
-                    if (context.abortEarly) return err;
+                    if (settings.abortEarly) return err;
                 }
             }
             return Object.keys(err).length > 0 ? err : null;
@@ -70,7 +70,7 @@ export function validate<Context extends ValidationContext>(schema: TypeSchema, 
             let lastError = "empty or";
             for (let i = 0; i < schema.schemas.length; i++) {
                 let sch = schema.schemas[i];
-                lastError = validate(sch, value, context);
+                lastError = validate(sch, value, context, settings);
                 if (!lastError) return null;
             }
             return lastError;
@@ -78,7 +78,7 @@ export function validate<Context extends ValidationContext>(schema: TypeSchema, 
         case "and": {
             for (let i = 0; i < schema.schemas.length; i++) {
                 let sch = schema.schemas[i];
-                let res = validate(sch, value, context);
+                let res = validate(sch, value, context, settings);
                 if (res) return res;
             }
             return null;
@@ -88,13 +88,13 @@ export function validate<Context extends ValidationContext>(schema: TypeSchema, 
         case "false":
             return "this value may not exist";
         case "function":
-            let fn = context.customValidators?.[schema.name];
+            let fn = settings.customValidators?.[schema.name];
             if (!fn) throw new Error(`Custom validator '${schema.name}' not found`);
-            return fn(value, context);
+            return fn(value, context, settings);
         case "ref":
-            let sch = context.otherSchemas?.[schema.value];
+            let sch = settings.otherSchemas?.[schema.value];
             if (!sch) throw new Error(`Could not find validator for type '${schema.value}'`);
-            return validate(context.otherSchemas![schema.value], value, context);
+            return validate(settings.otherSchemas![schema.value], value, context, settings);
         case "unknown":
             throw new Error("Cannot validate unknown type.");
     }
