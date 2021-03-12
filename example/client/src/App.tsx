@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Client, User, UserWithoutId } from "shared";
+import { Client, Post, User, UserWithoutId } from "shared";
 import { FormError, FormInput, FormSelect, useForm } from "typed-react-form";
 
 let client = new Client({ path: "http://localhost:3002/" });
@@ -7,6 +7,7 @@ let client = new Client({ path: "http://localhost:3002/" });
 function App() {
     const form = useForm<UserWithoutId>({ password: "", birthDate: new Date(), email: "", gender: "male" }, (data) => Client.validateUserWithoutId(data) ?? {}, true, false);
     const [users, setUsers] = useState<User[] | null>(null);
+    const [posts, setPosts] = useState<Post[]>([]);
 
     useEffect(() => {
         (async () => {
@@ -24,7 +25,16 @@ function App() {
                     ? "No users yet"
                     : users.map((e) => (
                           <li>
-                              {e.email} ({e.gender})<button onClick={async () => alert(JSON.stringify(await client.userGet({ userId: e.id })))}>More info</button>
+                              {e.email} ({e.gender})
+                              <button
+                                  onClick={async () => {
+                                      // async () => alert(JSON.stringify(await client.userGet({ userId: e.id })))
+                                      let posts = await client.userPostList({ userId: e.id });
+                                      setPosts(posts.posts);
+                                  }}
+                              >
+                                  More info
+                              </button>
                           </li>
                       ))}
             </ul>
@@ -56,6 +66,25 @@ function App() {
                 </FormSelect>
                 <button>Create</button>
             </form>
+
+            <h3>Posts</h3>
+            {posts.length === 0
+                ? "No posts!"
+                : posts.map((post) => (
+                      <div key={post.id} style={{ background: "#0001", padding: "1em" }}>
+                          <h4>{post.title}</h4>
+                          <pre>{post.content}</pre>
+                      </div>
+                  ))}
+
+            <button
+                onClick={async () => {
+                    let newPost = await client.postCreate({ content: "Proident qui sint laborum duis eu do officia anim irure pariatur.", title: prompt("Enter title") as any });
+                    setPosts([...posts, newPost.post]);
+                }}
+            >
+                Create post!
+            </button>
         </div>
     );
 }

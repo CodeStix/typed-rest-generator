@@ -1,5 +1,5 @@
 import { ErrorType } from "./generatedClient";
-import { User, UserWithoutId, Gender } from "./generatedPrisma";
+import { User, UserWithoutId, Gender, Post } from "./generatedPrisma";
 
 export namespace Routes {
     export interface UserListResponse {
@@ -16,6 +16,23 @@ export namespace Routes {
 
     export interface UserCreateRequest {
         user: UserWithoutId;
+    }
+
+    export interface PostCreateRequest {
+        title: string;
+        content: string;
+    }
+
+    export interface PostCreateResponse {
+        post: Post;
+    }
+
+    export interface UserPostListRequest {
+        userId: number;
+    }
+
+    export interface UserPostListResponse {
+        posts: Post[];
     }
 
     export type UserCreateResponse =

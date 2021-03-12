@@ -50,4 +50,6 @@ app.post("/user/get", async (req, res, next) => {
     });
 });
 
+// app.post("/post/create", (req, res, next) => {});
+
 app.listen(3002);

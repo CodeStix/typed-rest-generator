@@ -3,7 +3,13 @@
 import type c from "express-serve-static-core";
 import type p from "qs";
 
-export type EndpointsConstraint = {
+export type ErrorType<T, Error extends string = string> = NonNullable<T> extends object ? ErrorMap<NonNullable<T>, Error> : Error;
+
+export type ErrorMap<T, Error extends string = string> = {
+    [Key in keyof T]?: ErrorType<T[Key], Error>;
+};
+
+type EndpointsConstraint = {
     [path: string]: {
         req: any;
         res: any;
@@ -42,7 +48,7 @@ declare module "express-serve-static-core" {
     }
 }
 
-export type TypeSchema =
+type TypeSchema =
     | { type: "and" | "or"; schemas: readonly TypeSchema[] }
     | { type: "ref"; value: string }
     | { type: "function"; name: string }
@@ -55,19 +61,14 @@ export type TypeSchema =
     | { type: "false" }
     | { type: "unknown" };
 
-export interface ValidationSettings<Context> {
+interface ValidationSettings<Context> {
     otherSchemas?: { [typeName: string]: TypeSchema };
     customValidators?: { [typeName: string]: (value: any, context: Context, settings: ValidationSettings<Context>) => any };
     abortEarly?: boolean;
 }
 
-export type ErrorType<T, Error extends string = string> = NonNullable<T> extends object ? ErrorMap<NonNullable<T>, Error> : Error;
-
-export type ErrorMap<T, Error extends string = string> = {
-    [Key in keyof T]?: ErrorType<T[Key], Error>;
-};
-
-export function validate<T, Context, Error extends string = string>(schema: TypeSchema, value: T, context: Context, settings: ValidationSettings<Context>): ErrorType<T, Error> | null {
+// Not exposed because will change in future
+function validate<T, Context, Error extends string = string>(schema: TypeSchema, value: T, context: Context, settings: ValidationSettings<Context>): ErrorType<T, Error> | null {
     switch (schema.type) {
         case "isType":
             return typeof value === schema.value ? null : (`must be of type ${schema.value}` as any);
@@ -204,6 +205,14 @@ export type Endpoints = {
             req: Routes.UserCreateRequest,
             res: Routes.UserCreateResponse,
         },
+		"/post/create": {
+            req: Routes.PostCreateRequest,
+            res: Routes.PostCreateResponse,
+        },
+		"/user/post/list": {
+            req: Routes.UserPostListRequest,
+            res: Routes.UserPostListResponse,
+        },
 }
 
 
@@ -221,6 +230,14 @@ public async userCreate(data: Routes.UserCreateRequest): Promise<Routes.UserCrea
             return await this.fetch("post", "/user/create", data);
         }
 
+public async postCreate(data: Routes.PostCreateRequest): Promise<Routes.PostCreateResponse> {
+            return await this.fetch("post", "/post/create", data);
+        }
+
+public async userPostList(data: Routes.UserPostListRequest): Promise<Routes.UserPostListResponse> {
+            return await this.fetch("post", "/user/post/list", data);
+        }
+
 public static validateRoutesUserGetRequest<Error extends string>(data: Routes.UserGetRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.UserGetRequest, Error> | null {
             return validate(SCHEMAS.RoutesUserGetRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
         }
@@ -231,6 +248,14 @@ public static validateRoutesUserCreateRequest<Error extends string>(data: Routes
 
 public static validateUserWithoutId<Error extends string>(data: UserWithoutId, context?: any, settings?: ValidationSettings<any>): ErrorType<UserWithoutId, Error> | null {
             return validate(SCHEMAS.UserWithoutId, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+        }
+
+public static validateRoutesPostCreateRequest<Error extends string>(data: Routes.PostCreateRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.PostCreateRequest, Error> | null {
+            return validate(SCHEMAS.RoutesPostCreateRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+        }
+
+public static validateRoutesUserPostListRequest<Error extends string>(data: Routes.UserPostListRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.UserPostListRequest, Error> | null {
+            return validate(SCHEMAS.RoutesUserPostListRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
         }
 
 public static validateDate<Error extends string>(data: Date, context?: any, settings?: ValidationSettings<any>): ErrorType<Date, Error> | null {
@@ -299,6 +324,28 @@ export const SCHEMAS = {
                 "name": "Validation.validateUserWithoutId"
             }
         ]
+    },
+    "RoutesPostCreateRequest": {
+        "type": "isObject",
+        "schema": {
+            "title": {
+                "type": "isType",
+                "value": "string"
+            },
+            "content": {
+                "type": "isType",
+                "value": "string"
+            }
+        }
+    },
+    "RoutesUserPostListRequest": {
+        "type": "isObject",
+        "schema": {
+            "userId": {
+                "type": "isType",
+                "value": "number"
+            }
+        }
     },
     "Date": {
         "type": "and",

@@ -296,9 +296,9 @@ export class Client extends BaseClient<Endpoints> {
 ${clientClassMethodImplementations.join("\n\n")}
 }
 
-export const SCHEMAS = ${JSON.stringify(typeSchemas, null, 4)} as const;
+const SCHEMAS = ${JSON.stringify(typeSchemas, null, 4)} as const;
 
-export const CUSTOM_VALIDATORS = {
+const CUSTOM_VALIDATORS = {
 ${customValidatorNames.map((e) => `\t"${e}": ${e}`).join(",\n")}
 }
     `);

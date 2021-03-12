@@ -11474,10 +11474,10 @@ type@^2.0.0:
   resolved "https://registry.yarnpkg.com/type/-/type-2.0.0.tgz#5f16ff6ef2eb44f260494dae271033b29c09a9c3"
   integrity sha512-KBt58xCHry4Cejnc2ISQAF7QY+ORngsWfxezO68+12hKV6lQY8P/psIkcbjeHWn7MqcgciWJyCCevFMJdIXpow==
 
-typed-react-form@^1.2.7:
-  version "1.2.7"
-  resolved "https://registry.yarnpkg.com/typed-react-form/-/typed-react-form-1.2.7.tgz#bd78071e8002b5978f98ffb65379ce758bbdebd5"
-  integrity sha512-JxTHkBU8nGJlu+hS/cARUBtTdefvBShbI0kklK1+ids2S2cRpGUWWPAIF6S1wi1PHYhS24q9UFbjIIaCvNZoXA==
+typed-react-form@^1.2.8:
+  version "1.2.8"
+  resolved "https://registry.yarnpkg.com/typed-react-form/-/typed-react-form-1.2.8.tgz#2e213eff2d872d584d317b0056b29c395c3d0a86"
+  integrity sha512-6loFYEzvLkpwDj5DN+BWWYjkwvFBBY3Bvhpmsy8LaLEon4QLsMybAzLSSpWk+DkShRAhH4gtydbIetVZHW+Xkw==
 
 typedarray-to-buffer@^3.1.5:
   version "3.1.5"
