@@ -38,7 +38,7 @@ export function typedRouter<T extends c.IRouter>(router: T): T & ITypedRouter {
             (req, res, next) => {
                 let val = PATH_VALIDATORS[path];
                 if (!val) return next();
-                let err = validate(SCHEMAS[val], req.body, {}, { customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+                let err = validate(SCHEMAS[val], req.body, {}, { abortEarly: true, strictObjects: true });
                 if (err === null) {
                     return next();
                 } else {
@@ -80,15 +80,13 @@ type TypeSchema =
     | { type: "false" }
     | { type: "unknown" };
 
-interface ValidationSettings<Context> {
-    otherSchemas?: { [typeName: string]: TypeSchema };
-    customValidators?: { [typeName: string]: (value: any, context: Context, settings: ValidationSettings<Context>) => any };
+interface ValidationSettings {
     abortEarly?: boolean;
     strictObjects?: boolean;
 }
 
 // Not exposed because will change in future
-function validate<T, Context, Error extends string = string>(schema: TypeSchema, value: T, context: Context, settings: ValidationSettings<Context>): ErrorType<T, Error> | null {
+function validate<T, Context, Error extends string = string>(schema: TypeSchema, value: T, context: Context, settings: ValidationSettings): ErrorType<T, Error> | null {
     switch (schema.type) {
         case "isType":
             return typeof value === schema.value ? null : (`must be of type ${schema.value}` as any);
@@ -158,13 +156,13 @@ function validate<T, Context, Error extends string = string>(schema: TypeSchema,
         case "false":
             return "this value should not exist" as any;
         case "function":
-            let fn = settings.customValidators?.[schema.name];
+            let fn = (CUSTOM_VALIDATORS as any)[schema.name];
             if (!fn) throw new Error(`Custom validator '${schema.name}' not found`);
             return fn(value, context, settings);
         case "ref":
-            let sch = settings.otherSchemas?.[schema.value];
+            let sch = (SCHEMAS as any)[schema.value];
             if (!sch) throw new Error(`Could not find validator for type '${schema.value}'`);
-            return validate(settings.otherSchemas![schema.value], value, context, settings);
+            return validate((SCHEMAS as any)[schema.value], value, context, settings);
         case "unknown":
             throw new Error("Cannot validate unknown type.");
     }
@@ -288,56 +286,56 @@ export class Client extends BaseClient<Endpoints> {
         /**
          * Validates `Routes.UserGetRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
          */
-        public static validateRoutesUserGetRequest<Error extends string>(data: Routes.UserGetRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.UserGetRequest, Error> | null {
-            return validate(SCHEMAS.RoutesUserGetRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+        public static validateRoutesUserGetRequest<Error extends string>(data: Routes.UserGetRequest, context?: any, settings: ValidationSettings = {}): ErrorType<Routes.UserGetRequest, Error> | null {
+            return validate(SCHEMAS.RoutesUserGetRequest, data, context, settings);
         }
 
 
         /**
          * Validates `Routes.UserCreateRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
          */
-        public static validateRoutesUserCreateRequest<Error extends string>(data: Routes.UserCreateRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.UserCreateRequest, Error> | null {
-            return validate(SCHEMAS.RoutesUserCreateRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+        public static validateRoutesUserCreateRequest<Error extends string>(data: Routes.UserCreateRequest, context?: any, settings: ValidationSettings = {}): ErrorType<Routes.UserCreateRequest, Error> | null {
+            return validate(SCHEMAS.RoutesUserCreateRequest, data, context, settings);
         }
 
 
         /**
          * Validates `UserWithoutId` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
          */
-        public static validateUserWithoutId<Error extends string>(data: UserWithoutId, context?: any, settings?: ValidationSettings<any>): ErrorType<UserWithoutId, Error> | null {
-            return validate(SCHEMAS.UserWithoutId, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+        public static validateUserWithoutId<Error extends string>(data: UserWithoutId, context?: any, settings: ValidationSettings = {}): ErrorType<UserWithoutId, Error> | null {
+            return validate(SCHEMAS.UserWithoutId, data, context, settings);
         }
 
 
         /**
          * Validates `Routes.PostCreateRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
          */
-        public static validateRoutesPostCreateRequest<Error extends string>(data: Routes.PostCreateRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.PostCreateRequest, Error> | null {
-            return validate(SCHEMAS.RoutesPostCreateRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+        public static validateRoutesPostCreateRequest<Error extends string>(data: Routes.PostCreateRequest, context?: any, settings: ValidationSettings = {}): ErrorType<Routes.PostCreateRequest, Error> | null {
+            return validate(SCHEMAS.RoutesPostCreateRequest, data, context, settings);
         }
 
 
         /**
          * Validates `Routes.UserPostListRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
          */
-        public static validateRoutesUserPostListRequest<Error extends string>(data: Routes.UserPostListRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.UserPostListRequest, Error> | null {
-            return validate(SCHEMAS.RoutesUserPostListRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+        public static validateRoutesUserPostListRequest<Error extends string>(data: Routes.UserPostListRequest, context?: any, settings: ValidationSettings = {}): ErrorType<Routes.UserPostListRequest, Error> | null {
+            return validate(SCHEMAS.RoutesUserPostListRequest, data, context, settings);
         }
 
 
         /**
          * Validates `Date` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
          */
-        public static validateDate<Error extends string>(data: Date, context?: any, settings?: ValidationSettings<any>): ErrorType<Date, Error> | null {
-            return validate(SCHEMAS.Date, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+        public static validateDate<Error extends string>(data: Date, context?: any, settings: ValidationSettings = {}): ErrorType<Date, Error> | null {
+            return validate(SCHEMAS.Date, data, context, settings);
         }
 
 
         /**
          * Validates `Gender` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
          */
-        public static validateGender<Error extends string>(data: Gender, context?: any, settings?: ValidationSettings<any>): ErrorType<Gender, Error> | null {
-            return validate(SCHEMAS.Gender, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+        public static validateGender<Error extends string>(data: Gender, context?: any, settings: ValidationSettings = {}): ErrorType<Gender, Error> | null {
+            return validate(SCHEMAS.Gender, data, context, settings);
         }
 }
 

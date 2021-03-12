@@ -38,7 +38,7 @@ export function typedRouter<T extends c.IRouter>(router: T): T & ITypedRouter {
             (req, res, next) => {
                 let val = PATH_VALIDATORS[path];
                 if (!val) return next();
-                let err = validate(SCHEMAS[val], req.body, {}, { customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+                let err = validate(SCHEMAS[val], req.body, {}, { abortEarly: true, strictObjects: true });
                 if (err === null) {
                     return next();
                 } else {
@@ -80,15 +80,13 @@ type TypeSchema =
     | { type: "false" }
     | { type: "unknown" };
 
-interface ValidationSettings<Context> {
-    otherSchemas?: { [typeName: string]: TypeSchema };
-    customValidators?: { [typeName: string]: (value: any, context: Context, settings: ValidationSettings<Context>) => any };
+interface ValidationSettings {
     abortEarly?: boolean;
     strictObjects?: boolean;
 }
 
 // Not exposed because will change in future
-function validate<T, Context, Error extends string = string>(schema: TypeSchema, value: T, context: Context, settings: ValidationSettings<Context>): ErrorType<T, Error> | null {
+function validate<T, Context, Error extends string = string>(schema: TypeSchema, value: T, context: Context, settings: ValidationSettings): ErrorType<T, Error> | null {
     switch (schema.type) {
         case "isType":
             return typeof value === schema.value ? null : (`must be of type ${schema.value}` as any);
@@ -158,13 +156,13 @@ function validate<T, Context, Error extends string = string>(schema: TypeSchema,
         case "false":
             return "this value should not exist" as any;
         case "function":
-            let fn = settings.customValidators?.[schema.name];
+            let fn = (CUSTOM_VALIDATORS as any)[schema.name];
             if (!fn) throw new Error(`Custom validator '${schema.name}' not found`);
             return fn(value, context, settings);
         case "ref":
-            let sch = settings.otherSchemas?.[schema.value];
+            let sch = (SCHEMAS as any)[schema.value];
             if (!sch) throw new Error(`Could not find validator for type '${schema.value}'`);
-            return validate(settings.otherSchemas![schema.value], value, context, settings);
+            return validate((SCHEMAS as any)[schema.value], value, context, settings);
         case "unknown":
             throw new Error("Cannot validate unknown type.");
     }
