@@ -1,7 +1,7 @@
 import ts, { programContainsEs6Modules } from "byots";
 import fs from "fs";
 import path from "path";
-import { getFromSourceFile, generatePackageContent, Validators, Methods } from "./generator";
+import { getFromSourceFile, generatePackageContent, Validators, PathTypes } from "./generator";
 import { Command } from "commander";
 import chokidar from "chokidar";
 
@@ -45,16 +45,7 @@ function execute(inputFile: string, outputFile: string) {
     if (!inputSourceFile) throw new Error(`Input file '${inputFile}' does not exist.`);
 
     let validatorTypes: Validators = {};
-    let methodTypes: Methods = {
-        post: {},
-        get: {},
-        put: {},
-        delete: {},
-        patch: {},
-        options: {},
-        head: {},
-        all: {},
-    };
+    let methodTypes: PathTypes = {};
     getFromSourceFile(typescriptProgram, inputSourceFile, methodTypes, validatorTypes);
 
     let output = fs.createWriteStream(outputFile); // path.join(inputFileDir, outputFile)

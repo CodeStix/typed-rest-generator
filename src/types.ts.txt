@@ -4,11 +4,9 @@ import type c from "express-serve-static-core";
 import type p from "qs";
 
 export type EndpointsConstraint = {
-    [M in "all" | "get" | "post" | "put" | "delete" | "patch" | "options" | "head"]: {
-        [path: string]: {
-            req: any;
-            res: any;
-        };
+    [path: string]: {
+        req: any;
+        res: any;
     };
 };
 
@@ -20,7 +18,7 @@ declare module "express-serve-static-core" {
 
     export interface IRouterMatcher<T, Method extends "all" | "get" | "post" | "put" | "delete" | "patch" | "options" | "head" = any> {
         <
-            Path extends keyof U[Method],
+            Path extends keyof U,
             P = c.ParamsDictionary,
             ReqQuery = p.ParsedQs,
             Locals extends Record<string, any> = Record<string, any>,
@@ -28,10 +26,10 @@ declare module "express-serve-static-core" {
         >(
             path: Path,
             // tslint:disable-next-line no-unnecessary-generics (This generic is meant to be passed explicitly.)
-            ...handlers: Array<c.RequestHandler<P, U[Method][Path]["res"], U[Method][Path]["req"], ReqQuery, Locals>>
+            ...handlers: Array<c.RequestHandler<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
         ): T;
         <
-            Path extends keyof U[Method],
+            Path extends keyof U,
             P = c.ParamsDictionary,
             ReqQuery = p.ParsedQs,
             Locals extends Record<string, any> = Record<string, any>,
@@ -39,7 +37,7 @@ declare module "express-serve-static-core" {
         >(
             path: Path,
             // tslint:disable-next-line no-unnecessary-generics (This generic is meant to be passed explicitly.)
-            ...handlers: Array<c.RequestHandlerParams<P, U[Method][Path]["res"], U[Method][Path]["req"], ReqQuery, Locals>>
+            ...handlers: Array<c.RequestHandlerParams<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
         ): T;
     }
 }

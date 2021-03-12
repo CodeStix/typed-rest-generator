@@ -10,10 +10,7 @@ export type Validators = {
         customValidator?: ts.Symbol;
     };
 };
-export type Method = "get" | "post" | "put" | "delete" | "patch" | "options" | "head" | "all";
-export type Methods = {
-    [M in Method]: PathTypes;
-};
+
 export type PathTypes = {
     [path: string]: EndPoint;
 };
@@ -82,28 +79,24 @@ function typeNameToPath(typeName: string) {
     );
 }
 
-export function getRouteTypes(node: ts.Node, typeChecker: ts.TypeChecker, methods: Methods, validators: Validators) {
+export function getRouteTypes(node: ts.Node, typeChecker: ts.TypeChecker, paths: PathTypes, validators: Validators) {
     if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) {
         let name = node.name.text;
         let m;
-        let regex = /^(Get|Post|Put|Patch|Delete|Head|Options)([a-zA-Z0-9_]+)(Response|Request)$/;
+        let regex = /^([a-zA-Z0-9_]+)(Response|Request)$/;
         if ((m = name.match(regex))) {
-            let method = m[1].toLowerCase() as Method;
-            let pathType = m[2];
-            let apiType = m[3] === "Request" ? "req" : "res";
+            let pathType = m[1];
+            let apiType = m[2] === "Request" ? "req" : "res";
 
             let references = new Set<ts.Symbol>();
             references.add(node.symbol);
             resolveRecursiveTypeReferences(node, typeChecker, references);
 
-            methods[method] = {
-                ...methods[method],
-                [pathType]: {
-                    ...methods[method]?.[pathType],
-                    [apiType]: {
-                        symbol: typeChecker.getSymbolAtLocation(node.name),
-                        deepReferences: references,
-                    },
+            paths[pathType] = {
+                ...paths[pathType],
+                [apiType]: {
+                    symbol: typeChecker.getSymbolAtLocation(node.name),
+                    deepReferences: references,
                 },
             };
 
@@ -159,7 +152,7 @@ export function getCustomValidatorTypes(node: ts.Node, typeChecker: ts.TypeCheck
     }
 }
 
-export function getFromSourceFile(program: ts.Program, file: ts.SourceFile, methodTypes: Methods, validatorTypes: Validators) {
+export function getFromSourceFile(program: ts.Program, file: ts.SourceFile, paths: PathTypes, validatorTypes: Validators) {
     let checker = program.getTypeChecker();
     file.statements.forEach((stmt) => {
         if (ts.isModuleDeclaration(stmt)) {
@@ -168,7 +161,7 @@ export function getFromSourceFile(program: ts.Program, file: ts.SourceFile, meth
                 body.statements.forEach((validateFunc) => getCustomValidatorTypes(validateFunc, checker, validatorTypes));
             } else if (stmt.name.text === "Routes") {
                 let body = stmt.body! as ts.ModuleBlock;
-                body.statements.forEach((routeType) => getRouteTypes(routeType, checker, methodTypes, validatorTypes));
+                body.statements.forEach((routeType) => getRouteTypes(routeType, checker, paths, validatorTypes));
             } else {
                 throw new Error(`Unsupported namespace '${stmt.name.text}', expected 'Validation' or 'Routes'`);
             }
@@ -176,7 +169,7 @@ export function getFromSourceFile(program: ts.Program, file: ts.SourceFile, meth
     });
 }
 
-export function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validators, methods: Methods, outputStream: fs.WriteStream, currentDirectory: string) {
+export function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validators, paths: PathTypes, outputStream: fs.WriteStream, currentDirectory: string) {
     // Copy default types
     outputStream.write(getDefaultTypes());
 
@@ -186,40 +179,33 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, validators: 
 
     // Create Endpoints type
     endPointsTypings.push(`export type Endpoints = {\n`);
-    Object.keys(methods).forEach((method) => {
-        let pathTypes = methods[method as Method]!;
+    Object.keys(paths).forEach((pathTypeName) => {
+        let endpoint = paths[pathTypeName];
 
-        endPointsTypings.push(`\t${method}: {\n`);
+        Object.keys(endpoint).forEach((apiType) => {
+            let node = endpoint[apiType as ApiType];
+            if (!node) return;
 
-        Object.keys(pathTypes).forEach((pathTypeName) => {
-            let endpoint = pathTypes[pathTypeName];
-
-            Object.keys(endpoint).forEach((apiType) => {
-                let node = endpoint[apiType as ApiType];
-                if (!node) return;
-
-                typesToImport.add(node.symbol);
-                // node.deepReferences.forEach((e) => typesToImport.add(e));
-            });
-
-            let path = typeNameToPath(pathTypeName);
-            console.log(`${pathTypeName} --> ${path}`);
-
-            let reqType = endpoint.req ? getSymbolUsageName(endpoint.req.symbol) : null;
-            let resType = endpoint.res ? getSymbolUsageName(endpoint.res.symbol) : null;
-
-            clientClassMethodImplementations.push(`public async ${method}${pathTypeName} (${reqType ? "data: " + reqType : ""}): Promise<${resType ?? "void"}> {
-                ${resType ? "return " : ""}await this.fetch("${method}", "${path}"${reqType ? ", data" : ""});
-            }`);
-
-            endPointsTypings.push(`\t\t"${path}": {
-                req: ${reqType ? reqType : "never"},
-                res: ${resType ? resType : "never"},
-            },\n`);
+            typesToImport.add(node.symbol);
+            // node.deepReferences.forEach((e) => typesToImport.add(e));
         });
 
-        endPointsTypings.push(`\t},\n`);
+        let path = typeNameToPath(pathTypeName);
+        console.log(`${pathTypeName} --> ${path}`);
+
+        let reqType = endpoint.req ? getSymbolUsageName(endpoint.req.symbol) : null;
+        let resType = endpoint.res ? getSymbolUsageName(endpoint.res.symbol) : null;
+
+        clientClassMethodImplementations.push(`public async ${pathTypeName} (${reqType ? "data: " + reqType : ""}): Promise<${resType ?? "void"}> {
+            ${resType ? "return " : ""}await this.fetch("post", "${path}"${reqType ? ", data" : ""});
+        }`);
+
+        endPointsTypings.push(`\t\t"${path}": {
+            req: ${reqType ? reqType : "never"},
+            res: ${resType ? resType : "never"},
+        },\n`);
     });
+
     endPointsTypings.push(`}\n\n`);
 
     // Generate validation schemas
@@ -248,8 +234,8 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, validators: 
         }
         typeSchemas[name] = impl;
 
-        clientClassMethodImplementations.push(`public static validate${name}(data: ${usageName}, context?: any, settings?: ValidationSettings<any>): ErrorMap<${usageName}> {
-            return validate(SCHEMAS.${name}, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS }) as any;
+        clientClassMethodImplementations.push(`public static validate${name}(data: ${usageName}, context?: any, settings?: ValidationSettings<any>): ErrorType<${usageName}> | null {
+            return validate(SCHEMAS.${name}, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
         }`);
     });
 
@@ -322,11 +308,11 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
         this.settings = settings;
     }
 
-    public fetch<Method extends keyof EndpointsConstraint, Path extends keyof Endpoints[Method]>(
-        method: Method,
+    public fetch<Path extends keyof Endpoints>(
+        method: string,
         path: Path,
-        body?: Endpoints[Method][Path]["req"]
-    ): Promise<Endpoints[Method][Path]["res"]> {
+        body?: Endpoints[Path]["req"]
+    ): Promise<Endpoints[Path]["res"]> {
         return this.settings.fetcher!(this.settings.path! + (path as string), method, body);
     }
 }

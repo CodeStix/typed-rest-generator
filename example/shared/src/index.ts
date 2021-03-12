@@ -30,26 +30,26 @@ export type Post = {
 };
 
 export namespace Routes {
-    export interface GetUsersResponse {
+    export interface UserListResponse {
         users: User[];
     }
 
-    export interface GetUserRequest {
+    export interface UserGetRequest {
         userId: number;
     }
 
-    export interface GetUserResponse {
+    export interface UserGetResponse {
         user: User;
     }
 
-    export interface PostUserRequest {
+    export interface UserCreateRequest {
         user: UserWithoutId;
     }
 
-    export type PostUserResponse =
+    export type UserCreateResponse =
         | {
               status: "error";
-              error: ErrorType<PostUserRequest>;
+              error: ErrorType<UserCreateRequest>;
           }
         | {
               status: "ok";
@@ -58,7 +58,7 @@ export namespace Routes {
 }
 
 export namespace Validation {
-    export function validatePostPostRequest(data: Routes.PostUserRequest) {
+    export function validatePostPostRequest(data: Routes.UserCreateRequest) {
         if (data.user.email.length < 5) return { user: { email: "must be longer" } };
         return null;
     }

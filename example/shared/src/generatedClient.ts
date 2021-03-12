@@ -4,11 +4,9 @@ import type c from "express-serve-static-core";
 import type p from "qs";
 
 export type EndpointsConstraint = {
-    [M in "all" | "get" | "post" | "put" | "delete" | "patch" | "options" | "head"]: {
-        [path: string]: {
-            req: any;
-            res: any;
-        };
+    [path: string]: {
+        req: any;
+        res: any;
     };
 };
 
@@ -19,65 +17,34 @@ declare module "express-serve-static-core" {
     }
 
     export interface IRouterMatcher<T, Method extends "all" | "get" | "post" | "put" | "delete" | "patch" | "options" | "head" = any> {
-        <
-            Path extends keyof U[Method],
-            P = c.ParamsDictionary,
-            ReqQuery = p.ParsedQs,
-            Locals extends Record<string, any> = Record<string, any>,
-            U extends EndpointsConstraint = Endpoints
-        >(
+        <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
             path: Path,
             // tslint:disable-next-line no-unnecessary-generics (This generic is meant to be passed explicitly.)
-            ...handlers: Array<c.RequestHandler<P, U[Method][Path]["res"], U[Method][Path]["req"], ReqQuery, Locals>>
+            ...handlers: Array<c.RequestHandler<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
         ): T;
-        <
-            Path extends keyof U[Method],
-            P = c.ParamsDictionary,
-            ReqQuery = p.ParsedQs,
-            Locals extends Record<string, any> = Record<string, any>,
-            U extends EndpointsConstraint = Endpoints
-        >(
+        <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
             path: Path,
             // tslint:disable-next-line no-unnecessary-generics (This generic is meant to be passed explicitly.)
-            ...handlers: Array<c.RequestHandlerParams<P, U[Method][Path]["res"], U[Method][Path]["req"], ReqQuery, Locals>>
+            ...handlers: Array<c.RequestHandlerParams<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
         ): T;
     }
 }
-import { Routes, Validation, UserWithoutId, Gender } from "./index"
-
+import { Routes, Validation, UserWithoutId, Gender } from "./index";
 
 export type Endpoints = {
-	post: {
-		"/user": {
-                req: Routes.PostUserRequest,
-                res: Routes.PostUserResponse,
-            },
-	},
-	get: {
-		"/users": {
-                req: never,
-                res: Routes.GetUsersResponse,
-            },
-		"/user": {
-                req: Routes.GetUserRequest,
-                res: Routes.GetUserResponse,
-            },
-	},
-	put: {
-	},
-	delete: {
-	},
-	patch: {
-	},
-	options: {
-	},
-	head: {
-	},
-	all: {
-	},
-}
-
-
+    "/user/list": {
+        req: never;
+        res: Routes.UserListResponse;
+    };
+    "/user/get": {
+        req: Routes.UserGetRequest;
+        res: Routes.UserGetResponse;
+    };
+    "/user/create": {
+        req: Routes.UserCreateRequest;
+        res: Routes.UserCreateResponse;
+    };
+};
 
 export async function defaultFetcher(url: any, method: any, body: any) {
     let res = await fetch(url, {
@@ -111,129 +78,125 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
         this.settings = settings;
     }
 
-    public fetch<Method extends keyof EndpointsConstraint, Path extends keyof Endpoints[Method]>(
-        method: Method,
-        path: Path,
-        body?: Endpoints[Method][Path]["req"]
-    ): Promise<Endpoints[Method][Path]["res"]> {
+    public fetch<Path extends keyof Endpoints>(method: string, path: Path, body?: Endpoints[Path]["req"]): Promise<Endpoints[Path]["res"]> {
         return this.settings.fetcher!(this.settings.path! + (path as string), method, body);
     }
 }
 
 export class Client extends BaseClient<Endpoints> {
-public async postUser (data: Routes.PostUserRequest): Promise<Routes.PostUserResponse> {
-                return await this.fetch("post", "/user", data);
-            }
+    public async UserList(): Promise<Routes.UserListResponse> {
+        return await this.fetch("post", "/user/list");
+    }
 
-public async getUsers (): Promise<Routes.GetUsersResponse> {
-                return await this.fetch("get", "/users");
-            }
+    public async UserGet(data: Routes.UserGetRequest): Promise<Routes.UserGetResponse> {
+        return await this.fetch("post", "/user/get", data);
+    }
 
-public async getUser (data: Routes.GetUserRequest): Promise<Routes.GetUserResponse> {
-                return await this.fetch("get", "/user", data);
-            }
+    public async UserCreate(data: Routes.UserCreateRequest): Promise<Routes.UserCreateResponse> {
+        return await this.fetch("post", "/user/create", data);
+    }
 
-public static validateRoutesGetUserRequest(data: Routes.GetUserRequest, context?: any, settings?: ValidationSettings<any>): ErrorMap<Routes.GetUserRequest> {
-            return validate(SCHEMAS.RoutesGetUserRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS }) as any;
-        }
+    public static validateRoutesUserGetRequest(data: Routes.UserGetRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.UserGetRequest> | null {
+        return validate(SCHEMAS.RoutesUserGetRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+    }
 
-public static validateRoutesPostUserRequest(data: Routes.PostUserRequest, context?: any, settings?: ValidationSettings<any>): ErrorMap<Routes.PostUserRequest> {
-            return validate(SCHEMAS.RoutesPostUserRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS }) as any;
-        }
+    public static validateRoutesUserCreateRequest(data: Routes.UserCreateRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.UserCreateRequest> | null {
+        return validate(SCHEMAS.RoutesUserCreateRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+    }
 
-public static validateUserWithoutId(data: UserWithoutId, context?: any, settings?: ValidationSettings<any>): ErrorMap<UserWithoutId> {
-            return validate(SCHEMAS.UserWithoutId, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS }) as any;
-        }
+    public static validateUserWithoutId(data: UserWithoutId, context?: any, settings?: ValidationSettings<any>): ErrorType<UserWithoutId> | null {
+        return validate(SCHEMAS.UserWithoutId, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+    }
 
-public static validateDate(data: Date, context?: any, settings?: ValidationSettings<any>): ErrorMap<Date> {
-            return validate(SCHEMAS.Date, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS }) as any;
-        }
+    public static validateDate(data: Date, context?: any, settings?: ValidationSettings<any>): ErrorType<Date> | null {
+        return validate(SCHEMAS.Date, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+    }
 
-public static validateGender(data: Gender, context?: any, settings?: ValidationSettings<any>): ErrorMap<Gender> {
-            return validate(SCHEMAS.Gender, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS }) as any;
-        }
+    public static validateGender(data: Gender, context?: any, settings?: ValidationSettings<any>): ErrorType<Gender> | null {
+        return validate(SCHEMAS.Gender, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+    }
 }
 
 export const SCHEMAS = {
-    "RoutesGetUserRequest": {
-        "type": "isObject",
-        "schema": {
-            "userId": {
-                "type": "isType",
-                "value": "number"
-            }
-        }
+    RoutesUserGetRequest: {
+        type: "isObject",
+        schema: {
+            userId: {
+                type: "isType",
+                value: "number",
+            },
+        },
     },
-    "RoutesPostUserRequest": {
-        "type": "and",
-        "schemas": [
+    RoutesUserCreateRequest: {
+        type: "and",
+        schemas: [
             {
-                "type": "isObject",
-                "schema": {
-                    "user": {
-                        "type": "ref",
-                        "value": "UserWithoutId"
-                    }
-                }
+                type: "isObject",
+                schema: {
+                    user: {
+                        type: "ref",
+                        value: "UserWithoutId",
+                    },
+                },
             },
             {
-                "type": "function",
-                "name": "Validation.validatePostPostRequest"
-            }
-        ]
+                type: "function",
+                name: "Validation.validatePostPostRequest",
+            },
+        ],
     },
-    "UserWithoutId": {
-        "type": "isObject",
-        "schema": {
-            "email": {
-                "type": "isType",
-                "value": "string"
+    UserWithoutId: {
+        type: "isObject",
+        schema: {
+            email: {
+                type: "isType",
+                value: "string",
             },
-            "password": {
-                "type": "isType",
-                "value": "string"
+            password: {
+                type: "isType",
+                value: "string",
             },
-            "birthDate": {
-                "type": "ref",
-                "value": "Date"
+            birthDate: {
+                type: "ref",
+                value: "Date",
             },
-            "gender": {
-                "type": "ref",
-                "value": "Gender"
-            }
-        }
+            gender: {
+                type: "ref",
+                value: "Gender",
+            },
+        },
     },
-    "Date": {
-        "type": "and",
-        "schemas": [
+    Date: {
+        type: "and",
+        schemas: [
             {
-                "type": "true"
+                type: "true",
             },
             {
-                "type": "function",
-                "name": "Validation.validateDate"
-            }
-        ]
+                type: "function",
+                name: "Validation.validateDate",
+            },
+        ],
     },
-    "Gender": {
-        "type": "and",
-        "schemas": [
+    Gender: {
+        type: "and",
+        schemas: [
             {
-                "type": "true"
+                type: "true",
             },
             {
-                "type": "function",
-                "name": "Validation.validateGender"
-            }
-        ]
-    }
+                type: "function",
+                name: "Validation.validateGender",
+            },
+        ],
+    },
 } as const;
 
 export const CUSTOM_VALIDATORS = {
-	"Validation.validatePostPostRequest": Validation.validatePostPostRequest,
-	"Validation.validateDate": Validation.validateDate,
-	"Validation.validateGender": Validation.validateGender
-}
+    "Validation.validatePostPostRequest": Validation.validatePostPostRequest,
+    "Validation.validateDate": Validation.validateDate,
+    "Validation.validateGender": Validation.validateGender,
+};
 
 export type TypeSchema =
     | { type: "and" | "or"; schemas: readonly TypeSchema[] }
@@ -340,5 +303,3 @@ export function validate<T, Context>(schema: TypeSchema, value: T, context: Cont
             throw new Error("Cannot validate unknown type.");
     }
 }
-
-    
