@@ -205,7 +205,11 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, validators: 
         console.log(`--> "${path}": ${functionName}`);
 
         // Create client fetch function
-        clientClassMethodImplementations.push(`public async ${functionName}(${reqType ? "data: " + reqType : ""}): Promise<${resType ?? "void"}> {
+        clientClassMethodImplementations.push(`
+        /**
+         * Fetches "${path}" from the server. (\`${pathTypeName}\`)
+         */
+        public async ${functionName}(${reqType ? "data: " + reqType : ""}): Promise<${resType ?? "void"}> {
             ${resType ? "return " : ""}await this.fetch("post", "${path}"${reqType ? ", data" : ""});
         }`);
 
@@ -249,7 +253,11 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, validators: 
         }
         typeSchemas[name] = impl;
 
-        clientClassMethodImplementations.push(`public static validate${name}<Error extends string>(data: ${usageName}, context?: any, settings?: ValidationSettings<any>): ErrorType<${usageName}, Error> | null {
+        clientClassMethodImplementations.push(`
+        /**
+         * Validates \`${usageName}\` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validate${name}<Error extends string>(data: ${usageName}, context?: any, settings?: ValidationSettings<any>): ErrorType<${usageName}, Error> | null {
             return validate(SCHEMAS.${name}, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
         }`);
     });

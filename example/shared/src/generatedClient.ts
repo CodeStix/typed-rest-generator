@@ -191,7 +191,6 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
 }import { Routes, Validation } from "./index"
 import { UserWithoutId, Gender } from "./generatedPrisma"
 
-
 export type Endpoints = {
 		"/user/list": {
             req: never,
@@ -218,56 +217,104 @@ export type Endpoints = {
 
 
 export class Client extends BaseClient<Endpoints> {
-public async userList(): Promise<Routes.UserListResponse> {
+
+        /**
+         * Fetches "/user/list" from the server. (`UserList`)
+         */
+        public async userList(): Promise<Routes.UserListResponse> {
             return await this.fetch("post", "/user/list");
         }
 
-public async userGet(data: Routes.UserGetRequest): Promise<Routes.UserGetResponse> {
+
+        /**
+         * Fetches "/user/get" from the server. (`UserGet`)
+         */
+        public async userGet(data: Routes.UserGetRequest): Promise<Routes.UserGetResponse> {
             return await this.fetch("post", "/user/get", data);
         }
 
-public async userCreate(data: Routes.UserCreateRequest): Promise<Routes.UserCreateResponse> {
+
+        /**
+         * Fetches "/user/create" from the server. (`UserCreate`)
+         */
+        public async userCreate(data: Routes.UserCreateRequest): Promise<Routes.UserCreateResponse> {
             return await this.fetch("post", "/user/create", data);
         }
 
-public async postCreate(data: Routes.PostCreateRequest): Promise<Routes.PostCreateResponse> {
+
+        /**
+         * Fetches "/post/create" from the server. (`PostCreate`)
+         */
+        public async postCreate(data: Routes.PostCreateRequest): Promise<Routes.PostCreateResponse> {
             return await this.fetch("post", "/post/create", data);
         }
 
-public async userPostList(data: Routes.UserPostListRequest): Promise<Routes.UserPostListResponse> {
+
+        /**
+         * Fetches "/user/post/list" from the server. (`UserPostList`)
+         */
+        public async userPostList(data: Routes.UserPostListRequest): Promise<Routes.UserPostListResponse> {
             return await this.fetch("post", "/user/post/list", data);
         }
 
-public static validateRoutesUserGetRequest<Error extends string>(data: Routes.UserGetRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.UserGetRequest, Error> | null {
+
+        /**
+         * Validates `Routes.UserGetRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validateRoutesUserGetRequest<Error extends string>(data: Routes.UserGetRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.UserGetRequest, Error> | null {
             return validate(SCHEMAS.RoutesUserGetRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
         }
 
-public static validateRoutesUserCreateRequest<Error extends string>(data: Routes.UserCreateRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.UserCreateRequest, Error> | null {
+
+        /**
+         * Validates `Routes.UserCreateRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validateRoutesUserCreateRequest<Error extends string>(data: Routes.UserCreateRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.UserCreateRequest, Error> | null {
             return validate(SCHEMAS.RoutesUserCreateRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
         }
 
-public static validateUserWithoutId<Error extends string>(data: UserWithoutId, context?: any, settings?: ValidationSettings<any>): ErrorType<UserWithoutId, Error> | null {
+
+        /**
+         * Validates `UserWithoutId` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validateUserWithoutId<Error extends string>(data: UserWithoutId, context?: any, settings?: ValidationSettings<any>): ErrorType<UserWithoutId, Error> | null {
             return validate(SCHEMAS.UserWithoutId, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
         }
 
-public static validateRoutesPostCreateRequest<Error extends string>(data: Routes.PostCreateRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.PostCreateRequest, Error> | null {
+
+        /**
+         * Validates `Routes.PostCreateRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validateRoutesPostCreateRequest<Error extends string>(data: Routes.PostCreateRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.PostCreateRequest, Error> | null {
             return validate(SCHEMAS.RoutesPostCreateRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
         }
 
-public static validateRoutesUserPostListRequest<Error extends string>(data: Routes.UserPostListRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.UserPostListRequest, Error> | null {
+
+        /**
+         * Validates `Routes.UserPostListRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validateRoutesUserPostListRequest<Error extends string>(data: Routes.UserPostListRequest, context?: any, settings?: ValidationSettings<any>): ErrorType<Routes.UserPostListRequest, Error> | null {
             return validate(SCHEMAS.RoutesUserPostListRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
         }
 
-public static validateDate<Error extends string>(data: Date, context?: any, settings?: ValidationSettings<any>): ErrorType<Date, Error> | null {
+
+        /**
+         * Validates `Date` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validateDate<Error extends string>(data: Date, context?: any, settings?: ValidationSettings<any>): ErrorType<Date, Error> | null {
             return validate(SCHEMAS.Date, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
         }
 
-public static validateGender<Error extends string>(data: Gender, context?: any, settings?: ValidationSettings<any>): ErrorType<Gender, Error> | null {
+
+        /**
+         * Validates `Gender` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validateGender<Error extends string>(data: Gender, context?: any, settings?: ValidationSettings<any>): ErrorType<Gender, Error> | null {
             return validate(SCHEMAS.Gender, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
         }
 }
 
-export const SCHEMAS = {
+const SCHEMAS = {
     "RoutesUserGetRequest": {
         "type": "isObject",
         "schema": {
@@ -373,13 +420,10 @@ export const SCHEMAS = {
     }
 } as const;
 
-export const CUSTOM_VALIDATORS = {
+const CUSTOM_VALIDATORS = {
 	"Validation.validatePostPostRequest": Validation.validatePostPostRequest,
 	"Validation.validateUserWithoutId": Validation.validateUserWithoutId,
 	"Validation.validateDate": Validation.validateDate,
 	"Validation.validateGender": Validation.validateGender
 }
-
-
-
     
