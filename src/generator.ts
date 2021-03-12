@@ -234,7 +234,7 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, validators: 
         }
         typeSchemas[name] = impl;
 
-        clientClassMethodImplementations.push(`public static validate${name}(data: ${usageName}, context?: any, settings?: ValidationSettings<any>): ErrorType<${usageName}> | null {
+        clientClassMethodImplementations.push(`public static validate${name}<Error extends string>(data: ${usageName}, context?: any, settings?: ValidationSettings<any>): ErrorType<${usageName}, Error> | null {
             return validate(SCHEMAS.${name}, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
         }`);
     });
@@ -346,20 +346,20 @@ export interface ValidationSettings<Context> {
     abortEarly?: boolean;
 }
 
-export type ErrorType<T> = string | (NonNullable<T> extends object ? ErrorMap<NonNullable<T>> : never);
+export type ErrorType<T, Error extends string = string> = NonNullable<T> extends object ? ErrorMap<NonNullable<T>, Error> : Error;
 
-export type ErrorMap<T> = {
-    [Key in keyof T]?: ErrorType<T>;
+export type ErrorMap<T, Error extends string = string> = {
+    [Key in keyof T]?: ErrorType<T, Error>;
 };
 
-export function validate<T, Context>(schema: TypeSchema, value: T, context: Context, settings: ValidationSettings<Context>): ErrorType<T> | null {
+export function validate<T, Context, Error extends string = string>(schema: TypeSchema, value: T, context: Context, settings: ValidationSettings<Context>): ErrorType<T, Error> | null {
     switch (schema.type) {
         case "isType":
-            return typeof value === schema.value ? null : \`must be of type \${schema.value}\`;
+            return typeof value === schema.value ? null : (\`must be of type \${schema.value}\` as any);
         case "isValue":
-            return value === schema.value ? null : \`must have value \${JSON.stringify(schema.value)}\`;
+            return value === schema.value ? null : (\`must have value \${JSON.stringify(schema.value)}\` as any);
         case "isObject": {
-            if (typeof value !== "object" || !value) return "invalid object";
+            if (typeof value !== "object" || !value) return "invalid object" as any;
             let keys = Object.keys(schema.schema);
             let err: any = {};
             for (let i = 0; i < keys.length; i++) {
@@ -373,7 +373,7 @@ export function validate<T, Context>(schema: TypeSchema, value: T, context: Cont
             return Object.keys(err).length > 0 ? err : null;
         }
         case "isArray": {
-            if (!Array.isArray(value)) return "invalid array";
+            if (!Array.isArray(value)) return "invalid array" as any;
             let err: any = {};
             for (let i = 0; i < value.length; i++) {
                 let item = value[i];
@@ -386,8 +386,8 @@ export function validate<T, Context>(schema: TypeSchema, value: T, context: Cont
             return Object.keys(err).length > 0 ? err : null;
         }
         case "isTuple": {
-            if (!Array.isArray(value)) return "invalid tuple";
-            if (value.length !== schema.itemSchemas.length) return "invalid tuple length";
+            if (!Array.isArray(value)) return "invalid tuple" as any;
+            if (value.length !== schema.itemSchemas.length) return "invalid tuple length" as any;
             let err: any = {};
             for (let i = 0; i < schema.itemSchemas.length; i++) {
                 let item = value[i];
@@ -400,7 +400,7 @@ export function validate<T, Context>(schema: TypeSchema, value: T, context: Cont
             return Object.keys(err).length > 0 ? err : null;
         }
         case "or": {
-            let lastError: ErrorType<T> | null = "invalid or";
+            let lastError: ErrorType<T, Error> | null = "invalid or" as any;
             for (let i = 0; i < schema.schemas.length; i++) {
                 let sch = schema.schemas[i];
                 lastError = validate(sch, value, context, settings);
@@ -412,14 +412,14 @@ export function validate<T, Context>(schema: TypeSchema, value: T, context: Cont
             for (let i = 0; i < schema.schemas.length; i++) {
                 let sch = schema.schemas[i];
                 let res = validate(sch, value, context, settings);
-                if (res) return res;
+                if (res) return res as any;
             }
             return null;
         }
         case "true":
             return null;
         case "false":
-            return "this value may not exist";
+            return "this value should not exist" as any;
         case "function":
             let fn = settings.customValidators?.[schema.name];
             if (!fn) throw new Error(\`Custom validator '\${schema.name}' not found\`);
