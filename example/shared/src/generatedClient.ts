@@ -132,6 +132,26 @@ public async getUsers (): Promise<Routes.GetUsersResponse> {
 public async getUser (data: Routes.GetUserRequest): Promise<Routes.GetUserResponse> {
                 return await this.fetch("get", "/user", data);
             }
+
+public static validateRoutesGetUserRequest(data: Routes.GetUserRequest, context?: any, settings?: ValidationSettings<any>): ErrorMap<Routes.GetUserRequest> {
+            return validate(SCHEMAS.RoutesGetUserRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS }) as any;
+        }
+
+public static validateRoutesPostUserRequest(data: Routes.PostUserRequest, context?: any, settings?: ValidationSettings<any>): ErrorMap<Routes.PostUserRequest> {
+            return validate(SCHEMAS.RoutesPostUserRequest, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS }) as any;
+        }
+
+public static validateUserWithoutId(data: UserWithoutId, context?: any, settings?: ValidationSettings<any>): ErrorMap<UserWithoutId> {
+            return validate(SCHEMAS.UserWithoutId, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS }) as any;
+        }
+
+public static validateDate(data: Date, context?: any, settings?: ValidationSettings<any>): ErrorMap<Date> {
+            return validate(SCHEMAS.Date, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS }) as any;
+        }
+
+public static validateGender(data: Gender, context?: any, settings?: ValidationSettings<any>): ErrorMap<Gender> {
+            return validate(SCHEMAS.Gender, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS }) as any;
+        }
 }
 
 export const SCHEMAS = {
@@ -237,7 +257,7 @@ export interface ValidationSettings<Context> {
 export type ErrorType<T> = string | (NonNullable<T> extends object ? ErrorMap<NonNullable<T>> : never);
 
 export type ErrorMap<T> = {
-    [Key in keyof T]: ErrorType<T>;
+    [Key in keyof T]?: ErrorType<T>;
 };
 
 export function validate<T, Context>(schema: TypeSchema, value: T, context: Context, settings: ValidationSettings<Context>): ErrorType<T> | null {

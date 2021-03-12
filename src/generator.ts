@@ -229,21 +229,28 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, validators: 
     let customValidatorNames: string[] = [];
     Object.keys(validators).forEach((validateTypeName) => {
         let validator = validators[validateTypeName];
+        let name = getSymbolFullName(validator.symbol);
+        let usageName = getSymbolUsageName(validator.symbol);
+
         typesToImport.add(validator.symbol);
         if (validator.customValidator) typesToImport.add(validator.customValidator);
+
         let decl: ts.Node = getMostSuitableDeclaration(validator.symbol.declarations)!;
-        let name = getSymbolFullName(validator.symbol);
-        if (typeSchemas[name]) throw new Error(`Duplicate validator for ${name}`);
+        if (typeSchemas[name]) throw new Error(`Duplicate validator for ${usageName}`);
         let impl = createTypeSchema(decl, typeChecker);
         if (validator.customValidator) {
-            let usageName = getSymbolUsageName(validator.customValidator);
-            customValidatorNames.push(usageName);
+            let customUsageName = getSymbolUsageName(validator.customValidator);
+            customValidatorNames.push(customUsageName);
             impl = {
                 type: "and",
-                schemas: [impl, { type: "function", name: usageName }],
+                schemas: [impl, { type: "function", name: customUsageName }],
             };
         }
         typeSchemas[name] = impl;
+
+        clientClassMethodImplementations.push(`public static validate${name}(data: ${usageName}, context?: any, settings?: ValidationSettings<any>): ErrorMap<${usageName}> {
+            return validate(SCHEMAS.${name}, data, context, { ...settings, customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS }) as any;
+        }`);
     });
 
     // Generate import statements
@@ -356,7 +363,7 @@ export interface ValidationSettings<Context> {
 export type ErrorType<T> = string | (NonNullable<T> extends object ? ErrorMap<NonNullable<T>> : never);
 
 export type ErrorMap<T> = {
-    [Key in keyof T]: ErrorType<T>;
+    [Key in keyof T]?: ErrorType<T>;
 };
 
 export function validate<T, Context>(schema: TypeSchema, value: T, context: Context, settings: ValidationSettings<Context>): ErrorType<T> | null {

@@ -18,8 +18,13 @@ function main() {
 
     if (options.watch) {
         console.log("Watching for changes...");
+        execute(inputFile, outputFile);
         chokidar.watch(inputFile, {}).on("change", (ev, file) => {
-            execute(inputFile, outputFile);
+            try {
+                execute(inputFile, outputFile);
+            } catch (ex) {
+                console.error(ex);
+            }
         });
     } else {
         execute(inputFile, outputFile);
