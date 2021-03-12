@@ -202,7 +202,7 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, validators: 
         let functionName = decapitalize(pathTypeName);
         let reqType = endpoint.req ? getSymbolUsageName(endpoint.req.symbol) : null;
         let resType = endpoint.res ? getSymbolUsageName(endpoint.res.symbol) : null;
-        console.log(`--> "${path}": ${functionName}`);
+        console.log(`"${path}" --> ${functionName}`);
 
         // Create client fetch function
         clientClassMethodImplementations.push(`

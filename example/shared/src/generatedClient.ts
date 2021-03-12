@@ -23,24 +23,12 @@ declare module "express-serve-static-core" {
     }
 
     export interface IRouterMatcher<T, Method extends "all" | "get" | "post" | "put" | "delete" | "patch" | "options" | "head" = any> {
-        <
-            Path extends keyof U,
-            P = c.ParamsDictionary,
-            ReqQuery = p.ParsedQs,
-            Locals extends Record<string, any> = Record<string, any>,
-            U extends EndpointsConstraint = Endpoints
-        >(
+        <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
             path: Path,
             // tslint:disable-next-line no-unnecessary-generics (This generic is meant to be passed explicitly.)
             ...handlers: Array<c.RequestHandler<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
         ): T;
-        <
-            Path extends keyof U,
-            P = c.ParamsDictionary,
-            ReqQuery = p.ParsedQs,
-            Locals extends Record<string, any> = Record<string, any>,
-            U extends EndpointsConstraint = Endpoints
-        >(
+        <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
             path: Path,
             // tslint:disable-next-line no-unnecessary-generics (This generic is meant to be passed explicitly.)
             ...handlers: Array<c.RequestHandlerParams<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
@@ -65,6 +53,7 @@ interface ValidationSettings<Context> {
     otherSchemas?: { [typeName: string]: TypeSchema };
     customValidators?: { [typeName: string]: (value: any, context: Context, settings: ValidationSettings<Context>) => any };
     abortEarly?: boolean;
+    strictObjects?: boolean;
 }
 
 // Not exposed because will change in future
@@ -77,6 +66,7 @@ function validate<T, Context, Error extends string = string>(schema: TypeSchema,
         case "isObject": {
             if (typeof value !== "object" || !value) return "invalid object" as any;
             let keys = Object.keys(schema.schema);
+            if ((settings.strictObjects ?? true) && Object.keys(value).some((e) => !keys.includes(e))) return "object contains unknown keys" as any;
             let err: any = {};
             for (let i = 0; i < keys.length; i++) {
                 let key = keys[i];
@@ -181,14 +171,11 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
         this.settings = settings;
     }
 
-    public fetch<Path extends keyof Endpoints>(
-        method: string,
-        path: Path,
-        body?: Endpoints[Path]["req"]
-    ): Promise<Endpoints[Path]["res"]> {
+    public fetch<Path extends keyof Endpoints>(method: string, path: Path, body?: Endpoints[Path]["req"]): Promise<Endpoints[Path]["res"]> {
         return this.settings.fetcher!(this.settings.path! + (path as string), method, body);
     }
-}import { Routes, Validation } from "./index"
+}
+import { Routes, Validation } from "./index"
 import { UserWithoutId, Gender } from "./generatedPrisma"
 
 export type Endpoints = {

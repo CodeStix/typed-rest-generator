@@ -22,8 +22,8 @@ app.post("/user/list", async (req, res, next) => {
 
 app.post("/user/create", async (req, res, next) => {
     let err = Client.validateRoutesUserCreateRequest(req.body);
-
     if (err) {
+        console.log("user create error", err);
         return res.json({
             status: "error",
             error: err.user!,
