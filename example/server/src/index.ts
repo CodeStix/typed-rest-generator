@@ -31,7 +31,7 @@ app.get("/users", async (req, res, next) => {
 app.get("/user", async (req, res, next) => {
     let error = validate(SCHEMAS.RoutesGetUserRequest, req.body, { req }, { abortEarly: false, otherSchemas: SCHEMAS, customValidators: CUSTOM_VALIDATORS });
     if (error) {
-        return res.json(error);
+        return res.json({});
     }
     let user = await prisma.user.findUnique({ where: { id: req.body.userId } });
     if (!user) {
