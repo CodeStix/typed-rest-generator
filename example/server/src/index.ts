@@ -13,14 +13,14 @@ app.use((req, res, next) => {
     next();
 });
 
-app.typedPost("/user/list", async (req, res, next) => {
+app.typed("/user/list", async (req, res, next) => {
     let users = await prisma.user.findMany();
     res.json({
         users,
     });
 });
 
-app.typedPost("/user/create", async (req, res, next) => {
+app.typed("/user/create", async (req, res, next) => {
     let err = Client.validateRoutesUserCreateRequest(req.body);
     if (err) {
         console.log("user create error", err);
@@ -36,7 +36,7 @@ app.typedPost("/user/create", async (req, res, next) => {
     res.json({ status: "ok", user: user });
 });
 
-app.typedPost("/user/get", async (req, res, next) => {
+app.typed("/user/get", async (req, res, next) => {
     let err = Client.validateRoutesUserGetRequest(req.body);
     if (err) {
         return res.status(404).end();

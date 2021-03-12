@@ -184,6 +184,9 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, validators: 
     let clientClassMethodImplementations: string[] = [];
     let typesToImport = new Set<ts.Symbol>();
     let endPointsTypings: string[] = [];
+    let pathValidators: {
+        [path: string]: string;
+    } = {};
 
     // Create Endpoints type
     endPointsTypings.push(`export type Endpoints = {\n`);
@@ -218,6 +221,8 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, validators: 
             req: ${reqType ? reqType : "never"},
             res: ${resType ? resType : "never"},
         },\n`);
+
+        if (endpoint.req) pathValidators[path] = getSymbolFullName(endpoint.req.symbol);
     });
 
     endPointsTypings.push(`}\n\n`);
@@ -295,6 +300,14 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, validators: 
         let elems = imports[importName];
         outputStream.write(`import { ${[...elems].join(", ")} } from "${importName}"\n`);
     });
+
+    outputStream.write(`\nconst PATH_VALIDATORS: {
+        [Key in keyof Endpoints]?: keyof typeof SCHEMAS;
+    } = {\n`);
+    Object.keys(pathValidators).forEach((path) => {
+        outputStream.write(`\t"${path}": "${pathValidators[path]}",\n`);
+    });
+    outputStream.write("}\n");
 
     // Write code
     outputStream.write(`

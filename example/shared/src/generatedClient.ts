@@ -17,7 +17,7 @@ type EndpointsConstraint = {
 };
 
 interface ITypedRouter {
-    typedPost: ITypedRouterPostMatcher<this>;
+    typed: ITypedRouterPostMatcher<this>;
 }
 
 interface ITypedRouterPostMatcher<T> {
@@ -32,7 +32,23 @@ interface ITypedRouterPostMatcher<T> {
 }
 
 export function typedRouter<T extends c.IRouter>(router: T): T & ITypedRouter {
-    (router as any).typedPost = router.post;
+    (router as any).typed = (path: keyof Endpoints, ...rest: any[]) => {
+        router.post(
+            path,
+            (req, res, next) => {
+                let val = PATH_VALIDATORS[path];
+                if (!val) return next();
+                let err = validate(SCHEMAS[val], req.body, {}, { customValidators: CUSTOM_VALIDATORS, otherSchemas: SCHEMAS });
+                if (err === null) {
+                    return next();
+                } else {
+                    // next(new Error("Invalid body"))
+                    return res.status(400).json(err);
+                }
+            },
+            ...rest
+        );
+    };
     return router as any;
 }
 
@@ -192,6 +208,15 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
 }
 import { Routes, Validation } from "./index"
 import { UserWithoutId, Gender } from "./generatedPrisma"
+
+const PATH_VALIDATORS: {
+        [Key in keyof Endpoints]?: keyof typeof SCHEMAS;
+    } = {
+	"/user/get": "RoutesUserGetRequest",
+	"/user/create": "RoutesUserCreateRequest",
+	"/post/create": "RoutesPostCreateRequest",
+	"/user/post/list": "RoutesUserPostListRequest",
+}
 
 export type Endpoints = {
 		"/user/list": {
