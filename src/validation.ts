@@ -168,10 +168,6 @@ export function createTypeSchema(node: ts.Node, checker: ts.TypeChecker): TypeSc
             andOr.push(createTypeSchema(type, checker));
         });
         return { type: ts.isUnionTypeNode(node) ? "or" : "and", schemas: andOr };
-    } else if (ts.isImportSpecifier(node)) {
-        let imp = checker.getTypeAtLocation(node.propertyName ?? node.name).symbol;
-        if (!imp || !imp.declarations || imp.declarations.length < 1) throw new Error(`Type ${node.name.text} not found.`);
-        return createTypeSchema(imp.getDeclarations()![0], checker);
     } else {
         console.warn(`Unknown node, this will always validate to true (${ts.SyntaxKind[node.kind]}): ${node.getText()}`);
         return { type: "true" };

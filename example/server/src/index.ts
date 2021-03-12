@@ -1,10 +1,6 @@
 import express, { RequestHandler, IRouterMatcher } from "express";
 import { Post, PrismaClient } from "@prisma/client";
-import { Routes, Validation, validate, SCHEMAS, CUSTOM_VALIDATORS } from "shared";
-import {} from "express-serve-static-core";
-
-// let client = new Client();
-// client.fetch("post", "/post", { id: "100" });
+import { Client } from "shared";
 
 const app = express();
 const prisma = new PrismaClient();
@@ -17,10 +13,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// app.get("/user", (req, res, next) => {
-//     res.end("hello world");
-// });
-
 app.get("/users", async (req, res, next) => {
     let users = await prisma.user.findMany();
     res.json({
@@ -28,10 +20,25 @@ app.get("/users", async (req, res, next) => {
     });
 });
 
-app.get("/user", async (req, res, next) => {
-    let error = validate(SCHEMAS.RoutesGetUserRequest, req.body, { req }, { abortEarly: false, otherSchemas: SCHEMAS, customValidators: CUSTOM_VALIDATORS });
-    if (error) {
-        return res.json({});
+app.post("/user/create", async (req, res, next) => {
+    let err = Client.validateRoutesUserCreateRequest(req.body);
+    if (err) {
+        return res.json({
+            status: "error",
+            error: err,
+        });
+    }
+    let user = await prisma.user.create({
+        data: req.body.user,
+    });
+
+    res.json({ status: "ok", user: user });
+});
+
+app.post("/user/get", async (req, res, next) => {
+    let err = Client.validateRoutesUserGetRequest(req.body);
+    if (err) {
+        return res.status(404).end();
     }
     let user = await prisma.user.findUnique({ where: { id: req.body.userId } });
     if (!user) {
@@ -41,36 +48,5 @@ app.get("/user", async (req, res, next) => {
         user,
     });
 });
-
-app.post("/user", async (req, res, next) => {
-    let error = validate(SCHEMAS.RoutesPostUserRequest, req.body, { req }, { abortEarly: false, otherSchemas: SCHEMAS, customValidators: CUSTOM_VALIDATORS });
-    if (error) {
-        console.log("user err", req.body, error);
-        res.json({
-            status: "error",
-            error: error,
-        });
-        return;
-    }
-
-    let user = await prisma.user.create({
-        data: req.body.user,
-    });
-
-    res.json({
-        status: "ok",
-        user,
-    });
-});
-
-// app.post("/post", (req, res, next) => {
-//     res.json({
-//         post: {},
-//     });
-// });
-
-// app.put("/post", (req, res, next) => {
-//     res.json({});
-// });
 
 app.listen(3002);
