@@ -178,7 +178,7 @@ export function followImport(node: ts.ImportSpecifier, typeChecker: ts.TypeCheck
 }
 
 export function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validators, paths: PathTypes, outputStream: fs.WriteStream, currentDirectory: string) {
-    // Copy default types
+    // Write default types
     outputStream.write(getDefaultTypes());
 
     let clientClassMethodImplementations: string[] = [];
@@ -190,25 +190,26 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, validators: 
     Object.keys(paths).forEach((pathTypeName) => {
         let endpoint = paths[pathTypeName];
 
+        // Import Request/Response types
         Object.keys(endpoint).forEach((apiType) => {
             let node = endpoint[apiType as ApiType];
             if (!node) return;
 
             typesToImport.add(node.symbol);
-            // node.deepReferences.forEach((e) => typesToImport.add(e));
         });
 
         let path = typeNameToPath(pathTypeName);
         let functionName = decapitalize(pathTypeName);
-        console.log(`${pathTypeName} --> ${path}`);
-
         let reqType = endpoint.req ? getSymbolUsageName(endpoint.req.symbol) : null;
         let resType = endpoint.res ? getSymbolUsageName(endpoint.res.symbol) : null;
+        console.log(`--> "${path}": ${functionName}`);
 
+        // Create client fetch function
         clientClassMethodImplementations.push(`public async ${functionName}(${reqType ? "data: " + reqType : ""}): Promise<${resType ?? "void"}> {
             ${resType ? "return " : ""}await this.fetch("post", "${path}"${reqType ? ", data" : ""});
         }`);
 
+        // Create Endpoints type entry
         endPointsTypings.push(`\t\t"${path}": {
             req: ${reqType ? reqType : "never"},
             res: ${resType ? resType : "never"},
@@ -236,6 +237,7 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, validators: 
             decl = followImport(decl, typeChecker).declarations![0];
         }
 
+        // Generate type validation schema
         let impl = createTypeSchema(decl, typeChecker);
         if (validator.customValidator) {
             let customUsageName = getSymbolUsageName(validator.customValidator);
@@ -279,14 +281,15 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, validators: 
         }
         names.add(getSymbolImportName(symbol));
     });
+
+    // Write import statements
     Object.keys(imports).forEach((importName) => {
         let elems = imports[importName];
         outputStream.write(`import { ${[...elems].join(", ")} } from "${importName}"\n`);
     });
 
-    // Create Client class typedefs
+    // Write code
     outputStream.write(`
-
 ${endPointsTypings.join("")}
 
 export class Client extends BaseClient<Endpoints> {
@@ -298,8 +301,5 @@ export const SCHEMAS = ${JSON.stringify(typeSchemas, null, 4)} as const;
 export const CUSTOM_VALIDATORS = {
 ${customValidatorNames.map((e) => `\t"${e}": ${e}`).join(",\n")}
 }
-
-
-
     `);
 }

@@ -3,7 +3,13 @@
 import type c from "express-serve-static-core";
 import type p from "qs";
 
-export type EndpointsConstraint = {
+export type ErrorType<T, Error extends string = string> = NonNullable<T> extends object ? ErrorMap<NonNullable<T>, Error> : Error;
+
+export type ErrorMap<T, Error extends string = string> = {
+    [Key in keyof T]?: ErrorType<T[Key], Error>;
+};
+
+type EndpointsConstraint = {
     [path: string]: {
         req: any;
         res: any;
@@ -42,7 +48,7 @@ declare module "express-serve-static-core" {
     }
 }
 
-export type TypeSchema =
+type TypeSchema =
     | { type: "and" | "or"; schemas: readonly TypeSchema[] }
     | { type: "ref"; value: string }
     | { type: "function"; name: string }
@@ -55,19 +61,14 @@ export type TypeSchema =
     | { type: "false" }
     | { type: "unknown" };
 
-export interface ValidationSettings<Context> {
+interface ValidationSettings<Context> {
     otherSchemas?: { [typeName: string]: TypeSchema };
     customValidators?: { [typeName: string]: (value: any, context: Context, settings: ValidationSettings<Context>) => any };
     abortEarly?: boolean;
 }
 
-export type ErrorType<T, Error extends string = string> = NonNullable<T> extends object ? ErrorMap<NonNullable<T>, Error> : Error;
-
-export type ErrorMap<T, Error extends string = string> = {
-    [Key in keyof T]?: ErrorType<T[Key], Error>;
-};
-
-export function validate<T, Context, Error extends string = string>(schema: TypeSchema, value: T, context: Context, settings: ValidationSettings<Context>): ErrorType<T, Error> | null {
+// Not exposed because will change in future
+function validate<T, Context, Error extends string = string>(schema: TypeSchema, value: T, context: Context, settings: ValidationSettings<Context>): ErrorType<T, Error> | null {
     switch (schema.type) {
         case "isType":
             return typeof value === schema.value ? null : (`must be of type ${schema.value}` as any);
