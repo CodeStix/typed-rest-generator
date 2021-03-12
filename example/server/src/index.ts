@@ -1,8 +1,8 @@
 import express, { RequestHandler, IRouterMatcher } from "express";
 import { Post, PrismaClient } from "@prisma/client";
-import { Client } from "shared";
+import { Client, typedRouter } from "shared";
 
-const app = express();
+const app = typedRouter(express());
 const prisma = new PrismaClient();
 
 app.use(express.json());
@@ -13,14 +13,14 @@ app.use((req, res, next) => {
     next();
 });
 
-app.post("/user/list", async (req, res, next) => {
+app.typedPost("/user/list", async (req, res, next) => {
     let users = await prisma.user.findMany();
     res.json({
         users,
     });
 });
 
-app.post("/user/create", async (req, res, next) => {
+app.typedPost("/user/create", async (req, res, next) => {
     let err = Client.validateRoutesUserCreateRequest(req.body);
     if (err) {
         console.log("user create error", err);
@@ -36,7 +36,7 @@ app.post("/user/create", async (req, res, next) => {
     res.json({ status: "ok", user: user });
 });
 
-app.post("/user/get", async (req, res, next) => {
+app.typedPost("/user/get", async (req, res, next) => {
     let err = Client.validateRoutesUserGetRequest(req.body);
     if (err) {
         return res.status(404).end();

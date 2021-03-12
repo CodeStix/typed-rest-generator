@@ -16,25 +16,40 @@ type EndpointsConstraint = {
     };
 };
 
-declare module "express-serve-static-core" {
-    // This is why get isn't type checked, we cannot override its default typing
-    export interface Application {
-        get: ((name: string) => any) & IRouterMatcher<this, "get">;
-    }
-
-    export interface IRouterMatcher<T, Method extends "all" | "get" | "post" | "put" | "delete" | "patch" | "options" | "head" = any> {
-        <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
-            path: Path,
-            // tslint:disable-next-line no-unnecessary-generics (This generic is meant to be passed explicitly.)
-            ...handlers: Array<c.RequestHandler<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
-        ): T;
-        <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
-            path: Path,
-            // tslint:disable-next-line no-unnecessary-generics (This generic is meant to be passed explicitly.)
-            ...handlers: Array<c.RequestHandlerParams<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
-        ): T;
-    }
+interface ITypedRouter {
+    typedPost: ITypedRouterPostMatcher<this>;
 }
+
+interface ITypedRouterPostMatcher<T> {
+    <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
+        path: Path,
+        ...handlers: Array<c.RequestHandler<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
+    ): T;
+    <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
+        path: Path,
+        ...handlers: Array<c.RequestHandlerParams<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
+    ): T;
+}
+
+export function typedRouter<T extends c.IRouter>(router: T): T & ITypedRouter {
+    (router as any).typedPost = router.post;
+    return router as any;
+}
+
+// declare module "express-serve-static-core" {
+//     export interface IRouterMatcher<T, Method extends "all" | "get" | "post" | "put" | "delete" | "patch" | "options" | "head" = any> {
+//         <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
+//             path: Path,
+//             // tslint:disable-next-line no-unnecessary-generics (This generic is meant to be passed explicitly.)
+//             ...handlers: Array<c.RequestHandler<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
+//         ): T;
+//         <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
+//             path: Path,
+//             // tslint:disable-next-line no-unnecessary-generics (This generic is meant to be passed explicitly.)
+//             ...handlers: Array<c.RequestHandlerParams<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
+//         ): T;
+//     }
+// }
 
 type TypeSchema =
     | { type: "and" | "or"; schemas: readonly TypeSchema[] }
