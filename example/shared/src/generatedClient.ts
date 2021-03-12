@@ -64,7 +64,7 @@ export interface ValidationSettings<Context> {
 export type ErrorType<T, Error extends string = string> = NonNullable<T> extends object ? ErrorMap<NonNullable<T>, Error> : Error;
 
 export type ErrorMap<T, Error extends string = string> = {
-    [Key in keyof T]?: ErrorType<T, Error>;
+    [Key in keyof T]?: ErrorType<T[Key], Error>;
 };
 
 export function validate<T, Context, Error extends string = string>(schema: TypeSchema, value: T, context: Context, settings: ValidationSettings<Context>): ErrorType<T, Error> | null {
@@ -209,15 +209,15 @@ export type Endpoints = {
 
 
 export class Client extends BaseClient<Endpoints> {
-public async UserList (): Promise<Routes.UserListResponse> {
+public async userList(): Promise<Routes.UserListResponse> {
             return await this.fetch("post", "/user/list");
         }
 
-public async UserGet (data: Routes.UserGetRequest): Promise<Routes.UserGetResponse> {
+public async userGet(data: Routes.UserGetRequest): Promise<Routes.UserGetResponse> {
             return await this.fetch("post", "/user/get", data);
         }
 
-public async UserCreate (data: Routes.UserCreateRequest): Promise<Routes.UserCreateResponse> {
+public async userCreate(data: Routes.UserCreateRequest): Promise<Routes.UserCreateResponse> {
             return await this.fetch("post", "/user/create", data);
         }
 
@@ -271,25 +271,34 @@ export const SCHEMAS = {
         ]
     },
     "UserWithoutId": {
-        "type": "isObject",
-        "schema": {
-            "email": {
-                "type": "isType",
-                "value": "string"
+        "type": "and",
+        "schemas": [
+            {
+                "type": "isObject",
+                "schema": {
+                    "email": {
+                        "type": "isType",
+                        "value": "string"
+                    },
+                    "password": {
+                        "type": "isType",
+                        "value": "string"
+                    },
+                    "birthDate": {
+                        "type": "ref",
+                        "value": "Date"
+                    },
+                    "gender": {
+                        "type": "ref",
+                        "value": "Gender"
+                    }
+                }
             },
-            "password": {
-                "type": "isType",
-                "value": "string"
-            },
-            "birthDate": {
-                "type": "ref",
-                "value": "Date"
-            },
-            "gender": {
-                "type": "ref",
-                "value": "Gender"
+            {
+                "type": "function",
+                "name": "Validation.validateUserWithoutId"
             }
-        }
+        ]
     },
     "Date": {
         "type": "and",
@@ -319,6 +328,7 @@ export const SCHEMAS = {
 
 export const CUSTOM_VALIDATORS = {
 	"Validation.validatePostPostRequest": Validation.validatePostPostRequest,
+	"Validation.validateUserWithoutId": Validation.validateUserWithoutId,
 	"Validation.validateDate": Validation.validateDate,
 	"Validation.validateGender": Validation.validateGender
 }

@@ -64,7 +64,7 @@ export interface ValidationSettings<Context> {
 export type ErrorType<T, Error extends string = string> = NonNullable<T> extends object ? ErrorMap<NonNullable<T>, Error> : Error;
 
 export type ErrorMap<T, Error extends string = string> = {
-    [Key in keyof T]?: ErrorType<T, Error>;
+    [Key in keyof T]?: ErrorType<T[Key], Error>;
 };
 
 export function validate<T, Context, Error extends string = string>(schema: TypeSchema, value: T, context: Context, settings: ValidationSettings<Context>): ErrorType<T, Error> | null {

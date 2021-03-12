@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { Client, User, Routes, UserWithoutId, ErrorMap } from "shared";
+import { Client, User, UserWithoutId } from "shared";
 import { FormError, FormInput, FormSelect, useForm } from "typed-react-form";
 
 let client = new Client({ path: "http://localhost:3002/" });
 
 function App() {
-    const form = useForm<UserWithoutId>({ password: "", birthDate: new Date(), email: "", gender: "male" });
+    const form = useForm<UserWithoutId>({ password: "", birthDate: new Date(), email: "", gender: "male" }, (data) => Client.validateUserWithoutId(data) ?? {}, true, false);
     const [users, setUsers] = useState<User[] | null>(null);
 
     useEffect(() => {
         (async () => {
-            setUsers((await client.getUsers()).users);
+            setUsers((await client.userList()).users);
         })();
     }, []);
 
@@ -24,7 +24,7 @@ function App() {
                     ? "No users yet"
                     : users.map((e) => (
                           <li>
-                              {e.email} ({e.gender})<button onClick={async () => alert(JSON.stringify(await client.getUser({ userId: e.id })))}>More info</button>
+                              {e.email} ({e.gender})<button onClick={async () => alert(JSON.stringify(await client.userGet({ userId: e.id })))}>More info</button>
                           </li>
                       ))}
             </ul>
@@ -33,10 +33,12 @@ function App() {
             <form
                 onSubmit={async (ev) => {
                     ev.preventDefault();
+                    await form.validate();
+                    if (form.error) return;
                     form.setState({ isSubmitting: true });
-                    let res = await client.postUser({ user: form.values });
-                    if (res.status === "error" && typeof res.error === "object") {
-                        form.setErrors(res.error.user as any);
+                    let res = await client.userCreate({ user: form.values });
+                    if (res.status === "error" && res.error && typeof res.error === "object") {
+                        form.setErrors(res.error);
                     }
                     form.setState({ isSubmitting: false });
                 }}

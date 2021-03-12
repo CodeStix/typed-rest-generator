@@ -1,3 +1,4 @@
+import { ErrorType } from "./generatedClient";
 import { User, UserWithoutId, Gender } from "./generatedPrisma";
 
 export namespace Routes {
@@ -20,7 +21,7 @@ export namespace Routes {
     export type UserCreateResponse =
         | {
               status: "error";
-              error: any; //ErrorType<UserCreateRequest>
+              error: ErrorType<UserWithoutId>;
           }
         | {
               status: "ok";
@@ -29,8 +30,12 @@ export namespace Routes {
 }
 
 export namespace Validation {
+    export function validateUserWithoutId(data: UserWithoutId) {
+        if (data.email.length < 5) return { email: "must be longer" };
+        return null;
+    }
+
     export function validatePostPostRequest(data: Routes.UserCreateRequest) {
-        if (data.user.email.length < 5) return { user: { email: "must be longer" } };
         return null;
     }
 
@@ -44,3 +49,4 @@ export namespace Validation {
 }
 
 export * from "./generatedClient";
+export * from "./generatedPrisma";

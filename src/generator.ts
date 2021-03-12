@@ -199,12 +199,13 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, validators: 
         });
 
         let path = typeNameToPath(pathTypeName);
+        let functionName = decapitalize(pathTypeName);
         console.log(`${pathTypeName} --> ${path}`);
 
         let reqType = endpoint.req ? getSymbolUsageName(endpoint.req.symbol) : null;
         let resType = endpoint.res ? getSymbolUsageName(endpoint.res.symbol) : null;
 
-        clientClassMethodImplementations.push(`public async ${pathTypeName} (${reqType ? "data: " + reqType : ""}): Promise<${resType ?? "void"}> {
+        clientClassMethodImplementations.push(`public async ${functionName}(${reqType ? "data: " + reqType : ""}): Promise<${resType ?? "void"}> {
             ${resType ? "return " : ""}await this.fetch("post", "${path}"${reqType ? ", data" : ""});
         }`);
 
@@ -232,10 +233,6 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, validators: 
 
         let decl: ts.Node = getMostSuitableDeclaration(validator.symbol.declarations)!;
         if (ts.isImportSpecifier(decl)) {
-            // let symbol = typeChecker.getDeclaredTypeOfSymbol(typeChecker.getSymbolAtLocation(decl.propertyName ?? decl.name)!).symbol;
-            // console.log("import", name, symbol?.name);
-            // if (!symbol || !symbol.declarations || symbol.declarations.length < 1) throw new Error(`Type ${decl.name.text} not found.`);
-            // decl = symbol.declarations[0];
             decl = followImport(decl, typeChecker).declarations![0];
         }
 

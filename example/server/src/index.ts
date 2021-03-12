@@ -13,7 +13,7 @@ app.use((req, res, next) => {
     next();
 });
 
-app.get("/users", async (req, res, next) => {
+app.post("/user/list", async (req, res, next) => {
     let users = await prisma.user.findMany();
     res.json({
         users,
@@ -22,10 +22,11 @@ app.get("/users", async (req, res, next) => {
 
 app.post("/user/create", async (req, res, next) => {
     let err = Client.validateRoutesUserCreateRequest(req.body);
+
     if (err) {
         return res.json({
             status: "error",
-            error: err,
+            error: err.user!,
         });
     }
     let user = await prisma.user.create({
