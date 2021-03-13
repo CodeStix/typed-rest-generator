@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "start": "ts-node src/index.ts",
-    "build": "tsc && cp src/types.d.ts dist/"
+    "build": "tsc && cp src/types.ts.txt dist/"
   },
   "dependencies": {
     "byots": "^4.3.0-dev.20210309.17.21",
@@ -20,6 +20,6 @@
     "@types/semver": "^7.3.4"
   },
   "bin": {
-    "routes": "node dist/index.js"
+    "rest-gen": "node dist/index.js"
   }
 }

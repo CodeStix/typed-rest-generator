@@ -156,10 +156,10 @@ export function getFromSourceFile(program: ts.Program, file: ts.SourceFile, path
     let checker = program.getTypeChecker();
     file.statements.forEach((stmt) => {
         if (ts.isModuleDeclaration(stmt)) {
-            if (stmt.name.text === "Validation") {
+            if (stmt.name.text.endsWith("Validation")) {
                 let body = stmt.body! as ts.ModuleBlock;
                 body.statements.forEach((validateFunc) => getCustomValidatorTypes(validateFunc, checker, validatorTypes));
-            } else if (stmt.name.text === "Routes") {
+            } else if (stmt.name.text.endsWith("Routes")) {
                 let body = stmt.body! as ts.ModuleBlock;
                 body.statements.forEach((routeType) => getRouteTypes(routeType, checker, paths, validatorTypes));
             } else {
@@ -177,7 +177,7 @@ export function followImport(node: ts.ImportSpecifier, typeChecker: ts.TypeCheck
     return type.aliasSymbol ?? type.symbol;
 }
 
-export function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validators, paths: PathTypes, outputStream: fs.WriteStream, currentDirectory: string) {
+export function generatePackageContent(typeChecker: ts.TypeChecker, validators: Validators, paths: PathTypes, outputStream: fs.WriteStream, outputDirectory: string) {
     // Write default types
     outputStream.write(getDefaultTypes());
 
@@ -283,7 +283,7 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, validators: 
             importName = (decl.parent.parent.parent.moduleSpecifier as ts.StringLiteral).text;
         } else {
             let file = decl.getSourceFile();
-            importName = path.relative(currentDirectory, file.fileName);
+            importName = path.relative(outputDirectory, file.fileName);
             if (importName.endsWith(".ts")) importName = importName.substring(0, importName.length - 3);
             if (!importName.startsWith(".")) importName = "./" + importName;
         }

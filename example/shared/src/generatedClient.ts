@@ -204,12 +204,14 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
         return this.settings.fetcher!(this.settings.path! + (path as string), method, body);
     }
 }
+import { UserRoutes } from "./userRoutes"
 import { Routes, Validation } from "./index"
 import { UserWithoutId, Gender } from "./generatedPrisma"
 
 const PATH_VALIDATORS: {
         [Key in keyof Endpoints]?: keyof typeof SCHEMAS;
     } = {
+	"/routes": "UserRoutesRoutesRequest",
 	"/user/get": "RoutesUserGetRequest",
 	"/user/create": "RoutesUserCreateRequest",
 	"/post/create": "RoutesPostCreateRequest",
@@ -217,6 +219,10 @@ const PATH_VALIDATORS: {
 }
 
 export type Endpoints = {
+		"/routes": {
+            req: UserRoutes.RoutesRequest,
+            res: never,
+        },
 		"/user/list": {
             req: never,
             res: Routes.UserListResponse,
@@ -242,6 +248,14 @@ export type Endpoints = {
 
 
 export class Client extends BaseClient<Endpoints> {
+
+        /**
+         * Fetches "/routes" from the server. (`Routes`)
+         */
+        public async routes(data: UserRoutes.RoutesRequest): Promise<void> {
+            await this.fetch("post", "/routes", data);
+        }
+
 
         /**
          * Fetches "/user/list" from the server. (`UserList`)
@@ -280,6 +294,14 @@ export class Client extends BaseClient<Endpoints> {
          */
         public async userPostList(data: Routes.UserPostListRequest): Promise<Routes.UserPostListResponse> {
             return await this.fetch("post", "/user/post/list", data);
+        }
+
+
+        /**
+         * Validates `UserRoutes.RoutesRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validateUserRoutesRoutesRequest<Error extends string>(data: UserRoutes.RoutesRequest, context?: any, settings: ValidationSettings = {}): ErrorType<UserRoutes.RoutesRequest, Error> | null {
+            return validate(SCHEMAS.UserRoutesRoutesRequest, data, context, settings);
         }
 
 
@@ -340,6 +362,15 @@ export class Client extends BaseClient<Endpoints> {
 }
 
 const SCHEMAS = {
+    "UserRoutesRoutesRequest": {
+        "type": "isObject",
+        "schema": {
+            "name": {
+                "type": "isType",
+                "value": "string"
+            }
+        }
+    },
     "RoutesUserGetRequest": {
         "type": "isObject",
         "schema": {

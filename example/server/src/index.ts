@@ -21,14 +21,6 @@ app.typed("/user/list", async (req, res, next) => {
 });
 
 app.typed("/user/create", async (req, res, next) => {
-    let err = Client.validateRoutesUserCreateRequest(req.body);
-    if (err) {
-        console.log("user create error", err);
-        return res.json({
-            status: "error",
-            error: err.user!,
-        });
-    }
     let user = await prisma.user.create({
         data: req.body.user,
     });
@@ -37,10 +29,6 @@ app.typed("/user/create", async (req, res, next) => {
 });
 
 app.typed("/user/get", async (req, res, next) => {
-    let err = Client.validateRoutesUserGetRequest(req.body);
-    if (err) {
-        return res.status(404).end();
-    }
     let user = await prisma.user.findUnique({ where: { id: req.body.userId } });
     if (!user) {
         return res.status(404).end();
@@ -49,7 +37,5 @@ app.typed("/user/get", async (req, res, next) => {
         user,
     });
 });
-
-// app.post("/post/create", (req, res, next) => {});
 
 app.listen(3002);

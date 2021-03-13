@@ -9,12 +9,13 @@ function main() {
     let program = new Command("route-gen");
     program.version("1.0.0");
     program.requiredOption("-i --input <file>", "The .ts file containing Routes/Validation namespaces.");
-    program.option("-o --output <file>", "The destination file to generate. Will be overwritten.", "generatedClient.ts");
+    program.option("-o --output <file>", "The destination file to generate. Will be overwritten.", "");
     program.option("-w --watch", "Watch the input file for changes.");
     program.parse(process.argv);
     let options = program.opts();
     let inputFile = options.input;
     let outputFile = options.output;
+    if (!outputFile) outputFile = path.join(path.dirname(inputFile), "generatedClient.ts");
 
     if (options.watch) {
         console.log("Watching for changes...");
@@ -32,7 +33,6 @@ function main() {
 }
 
 function execute(inputFile: string, outputFile: string) {
-    let inputFileDir = path.dirname(inputFile);
     console.log(`${inputFile} -> ${outputFile}`);
     let configFileName = ts.findConfigFile(process.cwd(), ts.sys.fileExists, "tsconfig.json");
     if (!configFileName) {
@@ -41,15 +41,19 @@ function execute(inputFile: string, outputFile: string) {
     let compilerOptionsFile = ts.readConfigFile(configFileName, ts.sys.readFile);
     let compilerOptions = ts.parseJsonConfigFileContent(compilerOptionsFile.config, ts.sys, "./").options;
     let typescriptProgram = ts.createProgram([inputFile], compilerOptions);
-    let inputSourceFile = typescriptProgram.getSourceFile(inputFile)!;
-    if (!inputSourceFile) throw new Error(`Input file '${inputFile}' does not exist.`);
-
     let validatorTypes: Validators = {};
     let methodTypes: PathTypes = {};
-    getFromSourceFile(typescriptProgram, inputSourceFile, methodTypes, validatorTypes);
 
-    let output = fs.createWriteStream(outputFile); // path.join(inputFileDir, outputFile)
-    generatePackageContent(typescriptProgram.getTypeChecker(), validatorTypes, methodTypes, output, inputFileDir);
+    let files = typescriptProgram.getSourceFiles();
+
+    files.forEach((f) => {
+        if (f.fileName.includes("node_modules/")) return;
+        console.log("File", path.relative(process.cwd(), f.fileName));
+        getFromSourceFile(typescriptProgram, f, methodTypes, validatorTypes);
+    });
+
+    let output = fs.createWriteStream(outputFile);
+    generatePackageContent(typescriptProgram.getTypeChecker(), validatorTypes, methodTypes, output, path.dirname(outputFile));
     output.close();
 }
 

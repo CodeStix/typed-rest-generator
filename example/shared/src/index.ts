@@ -67,3 +67,4 @@ export namespace Validation {
 
 export * from "./generatedClient";
 export * from "./generatedPrisma";
+export * from "./userRoutes";
