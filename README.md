@@ -32,7 +32,7 @@ The ultimate cli tool to generate typescript code that connects your client-side
     export * from "./routes.ts";
     ```
 
-2. Run the cli tool: `npx typedrest -i index.ts -o generatedClient.ts`. The tool will look for the _Routes_ namespaces and will generate a script containing validators, the `Client` class and the `typedRouter` helper.
+2. Run the cli tool: `npx typed-rest-generator -i index.ts -o generatedClient.ts`. The tool will look for the _Routes_ namespaces and will generate a script containing validators, the `Client` class and the `typedRouter` helper.
 3. The generated code can be used in the following ways:
 
     **Shared package**
@@ -79,7 +79,7 @@ The ultimate cli tool to generate typescript code that connects your client-side
 ## Command usage
 
 ```
-Usage: typedrest [options]
+Usage: typed-rest-generator [options]
 
 Options:
   -V, --version       output the version number

@@ -19,7 +19,5 @@
     "@types/node": "^14.14.32",
     "@types/semver": "^7.3.4"
   },
-  "bin": {
-    "typedrest": "node dist/index.js"
-  }
+  "bin": "dist/index.js"
 }

@@ -1,4 +1,6 @@
-import ts, { programContainsEs6Modules } from "byots";
+#!/usr/bin/env node
+
+import ts from "byots";
 import fs from "fs";
 import path from "path";
 import { getFromSourceFile, generatePackageContent, Validators, PathTypes } from "./generator";
@@ -6,7 +8,7 @@ import { Command } from "commander";
 import chokidar from "chokidar";
 
 function main() {
-    let program = new Command("typedrest");
+    let program = new Command("typed-rest-generator");
     program.version("1.0.0");
     program.requiredOption("-i --input <file>", "The .ts file containing Routes/Validation namespaces.");
     program.option("-o --output <file>", "The destination file to generate. Will be overwritten.", "");
