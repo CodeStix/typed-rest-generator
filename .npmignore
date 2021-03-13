@@ -1,0 +1,6 @@
+/.vscode/
+/src/
+/example/
+/.prettierrc
+/tsconfig.json
+/yarn.lock
