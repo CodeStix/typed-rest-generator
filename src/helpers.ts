@@ -59,3 +59,18 @@ export function symbolFlagsToString(flags: ts.SymbolFlags) {
     }
     return str.join(", ");
 }
+
+export function typeFlagsToString(flags: ts.TypeFlags): string {
+    let fl: string[] = [];
+    for (let a in ts.TypeFlags) {
+        let n = parseInt(ts.TypeFlags[a]);
+        if ((flags & n) === n) {
+            fl.push(a);
+        }
+    }
+    return fl.join(",");
+}
+
+export function symbolHasFlag(symbol: ts.Symbol, flag: ts.SymbolFlags) {
+    return (symbol.flags & flag) === flag;
+}

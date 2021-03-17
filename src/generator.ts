@@ -2,7 +2,7 @@ import ts from "byots";
 import fs from "fs";
 import path from "path";
 import { decapitalize, splitCapitalized, getSymbolUsageName, getMostSuitableDeclaration, getSymbolFullName, getSymbolImportName, isDefaultType } from "./helpers";
-import { createSchemaForTypeDeclaration, TypeSchema } from "./validation";
+import { createSchemaForTypeDeclaration, TypeSchema } from "./typeExtractor";
 
 export type PathTypes = {
     [path: string]: EndPoint;
