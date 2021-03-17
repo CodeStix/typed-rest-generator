@@ -378,7 +378,7 @@ const SCHEMAS = {
         "fields": {
             "email": {
                 "type": "string",
-                "regex": "^\\S+@\\S+\\.\\S+$"
+                "regex": "^\\S+@\\S+\\.\\S+"
             },
             "password": {
                 "type": "string",

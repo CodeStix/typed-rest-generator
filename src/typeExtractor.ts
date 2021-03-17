@@ -100,11 +100,13 @@ export function createSchemaForType(type: ts.Type, checker: ts.TypeChecker, othe
         case ts.TypeFlags.Union:
             return { type: "or", schemas: (type as ts.UnionType).types.map((e) => createSchemaForType(e, checker, otherTypes, customProps)) };
         case ts.TypeFlags.String:
+            let reg = customProps["regex"]?.trim();
+            if (reg && reg.startsWith("/") && reg.endsWith("/")) reg = reg.substring(1, reg.length - 2);
             return {
                 type: "string",
                 min: "min" in customProps ? parseInt(customProps["min"]) : undefined,
                 max: "max" in customProps ? parseInt(customProps["max"]) : undefined,
-                regex: customProps["regex"],
+                regex: reg,
             };
         case ts.TypeFlags.Number:
             return {

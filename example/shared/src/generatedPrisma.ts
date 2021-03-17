@@ -8,7 +8,7 @@ export type Gender = typeof Gender[keyof typeof Gender];
 export type User = {
     id: number;
     /**
-     * @v-regex ^\S+@\S+\.\S+$
+     * @v-regex /^\S+@\S+\.\S+$/
      */
     email: string;
     /**
