@@ -1,9 +1,8 @@
 import { Types, TypeSchema } from "./typeExtractor";
 
-export type ErrorType<T, Error> = Error | null | (T extends {} ? ErrorMap<T, Error> : never);
-
+export type ErrorType<T, Error = string> = Error | (T extends {} ? ErrorMap<T, Error> : never);
 export type ErrorMap<T, Error = string> = {
-    [Key in keyof T]?: ErrorType<NonNullable<T>, Error>;
+    [Key in keyof T]?: ErrorType<T[Key], Error>;
 };
 
 export interface ValidationSettings {
@@ -12,7 +11,7 @@ export interface ValidationSettings {
     maxStringLength?: number;
 }
 
-export function validate<T, Error extends string = string>(schema: TypeSchema, value: any, settings: ValidationSettings): ErrorType<T, Error> {
+export function validate<T, Error extends string = string>(schema: TypeSchema, value: any, settings: ValidationSettings): ErrorType<T, Error> | null {
     switch (schema.type) {
         case "never":
         case "unknown":

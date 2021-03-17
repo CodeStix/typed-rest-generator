@@ -3,15 +3,10 @@
 import type c from "express-serve-static-core";
 import type p from "qs";
 
-export type ErrorType<T, Error = string> = Error | null | (T extends {} ? ErrorMap<T, Error> : never);
-
-export type ErrorMap<T, Error = string> = {
-    [Key in keyof T]?: ErrorType<NonNullable<T>, Error>;
-};
-
 export type Types = {
     [name: string]: TypeSchema;
 };
+
 export type TypeSchema =
     | { type: "or"; schemas: readonly TypeSchema[] }
     | { type: "ref"; name: string }
@@ -90,13 +85,18 @@ export function typedRouter<T extends c.IRouter>(router: T): T & ITypedRouter {
 //     }
 // }
 
+export type ErrorType<T, Error = string> = Error | (T extends {} ? ErrorMap<T, Error> : never);
+export type ErrorMap<T, Error = string> = {
+    [Key in keyof T]?: ErrorType<T[Key], Error>;
+};
+
 export interface ValidationSettings {
     otherTypes?: Types;
     abortEarly?: boolean;
     maxStringLength?: number;
 }
 
-export function validate<T, Error extends string = string>(schema: TypeSchema, value: any, settings: ValidationSettings): ErrorType<T, Error> {
+export function validate<T, Error extends string = string>(schema: TypeSchema, value: any, settings: ValidationSettings): ErrorType<T, Error> | null {
     switch (schema.type) {
         case "never":
         case "unknown":

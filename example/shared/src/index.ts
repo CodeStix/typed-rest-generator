@@ -1,4 +1,4 @@
-import { ErrorType } from "./generatedClient";
+import { Client, ErrorMap, ErrorType } from "./generatedClient";
 import { User, UserWithoutId, Gender, Post } from "./generatedPrisma";
 
 export namespace Routes {

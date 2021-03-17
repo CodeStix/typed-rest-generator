@@ -6,7 +6,7 @@ The ultimate cli tool to generate typescript code that connects your client-side
 
 ## How it works
 
-1. You create a typescript file (in a shared package between your client and server) containing your routes in a _Routes_ namespace:
+1. Create a typescript file (in a shared package between your client and server) containing your routes in a _Routes_ namespace:
 
     ```ts
     // routes.ts
