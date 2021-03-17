@@ -22,7 +22,7 @@ app.typed("/user/list", async (req, res, next) => {
 
 app.typed("/user/create", async (req, res, next) => {
     let user = await prisma.user.create({
-        data: req.body.user,
+        data: req.body,
     });
 
     res.json({ status: "ok", user: user });

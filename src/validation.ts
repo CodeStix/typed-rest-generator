@@ -97,5 +97,14 @@ export function validate<T, Error extends string = string>(schema: TypeSchema, v
             }
             return Object.keys(err).length > 0 ? (err as any) : null;
         }
+        case "date": {
+            if (value instanceof Date) return null;
+            if (typeof value === "string" || typeof value === "number") {
+                let date = new Date(value);
+                return isNaN(date.getTime()) ? ("invalid date string" as Error) : null;
+            } else {
+                return "invalid date format" as Error;
+            }
+        }
     }
 }

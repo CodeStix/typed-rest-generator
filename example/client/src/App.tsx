@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { Client, Post, User, UserWithoutId } from "shared";
+import { Client, Post, Routes, User, UserWithoutId } from "shared";
 import { FormError, FormInput, FormSelect, useForm } from "typed-react-form";
 
 let client = new Client({ path: "http://localhost:3002/" });
 
 function App() {
-    const form = useForm<UserWithoutId>({ password: "", birthDate: new Date(), email: "", gender: "male" }, (data) => Client.validateUserWithoutId(data) ?? {}, true, false);
+    const form = useForm<Routes.UserCreateRequest>(
+        { password: "", birthDate: new Date(), email: "", gender: "male" },
+        (data) => (Client.validateUserCreateRequest(data) as any) ?? {},
+        true,
+        false
+    );
     const [users, setUsers] = useState<User[] | null>(null);
     const [posts, setPosts] = useState<Post[]>([]);
 
@@ -44,11 +49,13 @@ function App() {
                 onSubmit={async (ev) => {
                     ev.preventDefault();
                     await form.validate();
+                    console.log("submit", form.errorMap);
+
                     if (form.error) return;
                     form.setState({ isSubmitting: true });
-                    let res = await client.userCreate({ user: form.values });
+                    let res = await client.userCreate(form.values);
                     if (res.status === "error" && res.error && typeof res.error === "object") {
-                        form.setErrors(res.error);
+                        form.setErrors(res.error as any);
                     }
                     form.setState({ isSubmitting: false });
                 }}

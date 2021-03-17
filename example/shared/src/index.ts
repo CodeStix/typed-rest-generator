@@ -14,9 +14,7 @@ export namespace Routes {
         user: User;
     }
 
-    export interface UserCreateRequest {
-        user: UserWithoutId;
-    }
+    export type UserCreateRequest = Omit<User, "id">;
 
     export interface PostCreateRequest {
         title: string;

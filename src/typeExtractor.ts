@@ -19,6 +19,7 @@ export type TypeSchema =
     | { type: "boolean" }
     | { type: "object" }
     | { type: "never" }
+    | { type: "date" }
     | { type: "unknown" }
     | { type: "any" }
     | { type: "number"; min?: number; max?: number }
@@ -31,6 +32,10 @@ export const SKIP_TYPES = ["Date", "Decimal", "Function"];
 export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeChecker, otherTypes: Types): TypeSchema {
     let name = (type.aliasSymbol ?? type.symbol).name;
     let fullName = checker.typeToString(type);
+
+    if (fullName === "Date") {
+        return { type: "date" };
+    }
 
     if (SKIP_TYPES.includes(fullName)) {
         console.warn(`Not serializing type \`${fullName}\``);
