@@ -3,7 +3,7 @@
 import ts from "byots";
 import fs from "fs";
 import path from "path";
-import { getFromSourceFile, generatePackageContent, Validators, PathTypes } from "./generator";
+import { getFromSourceFile, generatePackageContent, PathTypes } from "./generator";
 import { Command } from "commander";
 import chokidar from "chokidar";
 
@@ -43,7 +43,6 @@ function execute(inputFile: string, outputFile: string) {
     let compilerOptionsFile = ts.readConfigFile(configFileName, ts.sys.readFile);
     let compilerOptions = ts.parseJsonConfigFileContent(compilerOptionsFile.config, ts.sys, "./").options;
     let typescriptProgram = ts.createProgram([inputFile], compilerOptions);
-    let validatorTypes: Validators = {};
     let methodTypes: PathTypes = {};
 
     let files = typescriptProgram.getSourceFiles();
@@ -51,11 +50,11 @@ function execute(inputFile: string, outputFile: string) {
     files.forEach((f) => {
         if (f.fileName.includes("node_modules/")) return;
         console.log("File", path.relative(process.cwd(), f.fileName));
-        getFromSourceFile(typescriptProgram, f, methodTypes, validatorTypes);
+        getFromSourceFile(typescriptProgram, f, methodTypes);
     });
 
     let output = fs.createWriteStream(outputFile);
-    generatePackageContent(typescriptProgram.getTypeChecker(), validatorTypes, methodTypes, output, path.dirname(outputFile));
+    generatePackageContent(typescriptProgram.getTypeChecker(), methodTypes, output, path.dirname(outputFile));
     output.close();
 }
 

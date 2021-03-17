@@ -3,11 +3,33 @@
 import type c from "express-serve-static-core";
 import type p from "qs";
 
-export type ErrorType<T, Error extends string = string> = NonNullable<T> extends object ? ErrorMap<NonNullable<T>, Error> : Error;
+type ErrorType<T, Error> = Error | null | (T extends {} ? ErrorMap<T, Error> : never);
 
-export type ErrorMap<T, Error extends string = string> = {
-    [Key in keyof T]?: ErrorType<T[Key], Error>;
+type ErrorMap<T, Error = string> = {
+    [Key in keyof T]?: ErrorType<NonNullable<T>, Error>;
 };
+
+export type Types = {
+    [name: string]: TypeSchema;
+};
+export type TypeSchema =
+    | { type: "or"; schemas: readonly TypeSchema[] }
+    | { type: "ref"; name: string }
+    | { type: "objectLiteral"; fields: Types }
+    | { type: "array"; itemType: TypeSchema; min?: number; max?: number }
+    | { type: "tuple"; itemTypes: readonly TypeSchema[] }
+    | { type: "undefined" }
+    | { type: "null" }
+    | { type: "string"; min?: number; max?: number; regex?: string }
+    | { type: "boolean" }
+    | { type: "object" }
+    | { type: "never" }
+    | { type: "unknown" }
+    | { type: "any" }
+    | { type: "number"; min?: number; max?: number }
+    | { type: "numberLiteral"; value: number }
+    | { type: "stringLiteral"; value: string }
+    | { type: "booleanLiteral"; value: boolean };
 
 type EndpointsConstraint = {
     [path: string]: {
@@ -38,7 +60,7 @@ export function typedRouter<T extends c.IRouter>(router: T): T & ITypedRouter {
             (req, res, next) => {
                 let val = PATH_VALIDATORS[path];
                 if (!val) return next();
-                let err = validate(SCHEMAS[val], req.body, {}, { abortEarly: true, strictObjects: true });
+                let err = validate(SCHEMAS[val], req.body, { abortEarly: true });
                 if (err === null) {
                     return next();
                 } else {
@@ -67,104 +89,97 @@ export function typedRouter<T extends c.IRouter>(router: T): T & ITypedRouter {
 //     }
 // }
 
-type TypeSchema =
-    | { type: "and" | "or"; schemas: readonly TypeSchema[] }
-    | { type: "ref"; value: string }
-    | { type: "function"; name: string }
-    | { type: "isType"; value: "string" | "boolean" | "number" | "object" }
-    | { type: "isValue"; value: any }
-    | { type: "isArray"; itemSchema: TypeSchema }
-    | { type: "isObject"; schema: { [key: string]: TypeSchema } }
-    | { type: "isTuple"; itemSchemas: readonly TypeSchema[] }
-    | { type: "true" }
-    | { type: "false" }
-    | { type: "unknown" };
-
-interface ValidationSettings {
+export interface ValidationSettings {
+    otherTypes?: Types;
     abortEarly?: boolean;
-    strictObjects?: boolean;
+    maxStringLength?: number;
 }
 
-// Not exposed because will change in future
-function validate<T, Context, Error extends string = string>(schema: TypeSchema, value: T, context: Context, settings: ValidationSettings): ErrorType<T, Error> | null {
+function validate<T, Error extends string = string>(schema: TypeSchema, value: any, settings: ValidationSettings = { otherTypes: SCHEMAS }): ErrorType<T, Error> {
     switch (schema.type) {
-        case "isType":
-            return typeof value === schema.value ? null : (`must be of type ${schema.value}` as any);
-        case "isValue":
-            return value === schema.value ? null : (`must have value ${JSON.stringify(schema.value)}` as any);
-        case "isObject": {
-            if (typeof value !== "object" || !value) return "invalid object" as any;
-            let keys = Object.keys(schema.schema);
-            if ((settings.strictObjects ?? true) && Object.keys(value).some((e) => !keys.includes(e))) return "object contains unknown keys" as any;
-            let err: any = {};
+        case "never":
+        case "unknown":
+            return "this value should not exist" as Error;
+        case "any":
+            return null;
+        case "number":
+            if (typeof value !== "number") return "must be of type `number`" as Error;
+            if (schema.min && value < schema.min) return "must be higher" as Error;
+            if (schema.max && value > schema.max) return "must be lower" as Error;
+            return null;
+        case "string":
+            if (typeof value !== "string") return "must be of type `string`" as Error;
+            if (schema.min && value.length < schema.min) return "must be longer" as Error;
+            let max = schema.max ?? settings.maxStringLength;
+            if (max && value.length > max) return "must be shorter" as Error;
+            if (schema.regex && value.match(schema.regex) === null) return "does not match regex" as Error;
+            return null;
+        case "boolean":
+        case "object":
+        case "undefined":
+            return typeof value === schema.type ? null : (`must be of type \`${schema.type}\`` as Error);
+        case "null":
+            return value === null ? null : ("must be `null`" as Error);
+        case "ref":
+            let sch = settings.otherTypes?.[schema.name];
+            if (!sch) throw new Error(`Schema for type \`${schema.name}\` was not found.`);
+            return validate(sch, value, settings);
+        case "stringLiteral":
+        case "booleanLiteral":
+        case "numberLiteral":
+            return value === schema.value ? null : (`must have value \`${schema.value}\`` as Error);
+
+        case "or": {
+            let err: ErrorType<T, Error>[] = [];
+            for (let i = 0; i < schema.schemas.length; i++) {
+                let sch = schema.schemas[i];
+                let res = validate<T, Error>(sch, value, settings);
+                if (res === null) return null;
+                err.push(res);
+            }
+            return err.join(", ") as Error;
+        }
+        case "array": {
+            if (!Array.isArray(value)) return "invalid array" as Error;
+            if (schema.min && value.length < schema.min) return "array too short" as Error;
+            if (schema.max && value.length > schema.max) return "array too long" as Error;
+            let err: ErrorMap<T, Error> = {};
+            for (let i = 0; i < value.length; i++) {
+                let res = validate(schema.itemType, value[i], settings);
+                if (res !== null) {
+                    err[i as keyof T] = res as any;
+                    if (settings.abortEarly) return err as any;
+                }
+            }
+            return Object.keys(err).length > 0 ? (err as any) : null;
+        }
+        case "objectLiteral": {
+            if (typeof value !== "object" || value === null) return "invalid object" as Error;
+            if (Object.keys(value).some((e) => !(e in schema.fields))) return "object contains unknown keys" as Error;
+            let err: ErrorMap<T, Error> = {};
+            let keys = Object.keys(schema.fields);
             for (let i = 0; i < keys.length; i++) {
                 let key = keys[i];
-                let res = validate(schema.schema[key], (value as any)[key], context, settings);
-                if (res) {
-                    err[key] = res;
-                    if (settings.abortEarly) return err;
+                let res = validate(schema.fields[key], value[key], settings);
+                if (res !== null) {
+                    err[key as keyof T] = res as any;
+                    if (settings.abortEarly) return err as any;
                 }
             }
-            return Object.keys(err).length > 0 ? err : null;
+            return Object.keys(err).length > 0 ? (err as any) : null;
         }
-        case "isArray": {
-            if (!Array.isArray(value)) return "invalid array" as any;
-            let err: any = {};
-            for (let i = 0; i < value.length; i++) {
-                let item = value[i];
-                let res = validate(schema.itemSchema, item, context, settings);
-                if (res) {
-                    err[i] = res;
-                    if (settings.abortEarly) return err;
+        case "tuple": {
+            if (!Array.isArray(value) || value.length > schema.itemTypes.length) return "invalid tuple" as Error;
+            let err: ErrorMap<T, Error> = {};
+            for (let i = 0; i < schema.itemTypes.length; i++) {
+                let res = validate(schema.itemTypes[i], value[i], settings);
+                if (res !== null) {
+                    err[i as keyof T] = res as any;
+                    if (settings.abortEarly) return err as any;
                 }
             }
-            return Object.keys(err).length > 0 ? err : null;
+            return Object.keys(err).length > 0 ? (err as any) : null;
         }
-        case "isTuple": {
-            if (!Array.isArray(value)) return "invalid tuple" as any;
-            if (value.length !== schema.itemSchemas.length) return "invalid tuple length" as any;
-            let err: any = {};
-            for (let i = 0; i < schema.itemSchemas.length; i++) {
-                let item = value[i];
-                let res = validate(schema.itemSchemas[i], item, context, settings);
-                if (res) {
-                    err[i] = res;
-                    if (settings.abortEarly) return err;
-                }
-            }
-            return Object.keys(err).length > 0 ? err : null;
-        }
-        case "or": {
-            let lastError: ErrorType<T, Error> | null = "invalid or" as any;
-            for (let i = 0; i < schema.schemas.length; i++) {
-                let sch = schema.schemas[i];
-                lastError = validate(sch, value, context, settings);
-                if (!lastError) return null;
-            }
-            return lastError;
-        }
-        case "and": {
-            for (let i = 0; i < schema.schemas.length; i++) {
-                let sch = schema.schemas[i];
-                let res = validate(sch, value, context, settings);
-                if (res) return res as any;
-            }
-            return null;
-        }
-        case "true":
-            return null;
-        case "false":
-            return "this value should not exist" as any;
-        case "function":
-            let fn = (CUSTOM_VALIDATORS as any)[schema.name];
-            if (!fn) throw new Error(`Custom validator '${schema.name}' not found`);
-            return fn(value, context, settings);
-        case "ref":
-            let sch = (SCHEMAS as any)[schema.value];
-            if (!sch) throw new Error(`Could not find validator for type '${schema.value}'`);
-            return validate((SCHEMAS as any)[schema.value], value, context, settings);
-        case "unknown":
-            throw new Error("Cannot validate unknown type.");
     }
 }
 
@@ -204,282 +219,207 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
         return this.settings.fetcher!(this.settings.path! + (path as string), method, body);
     }
 }
-import { UserRoutes } from "./userRoutes"
-import { Routes, Validation } from "./index"
-import { UserWithoutId, Gender } from "./generatedPrisma"
+import { UserRoutes } from "./userRoutes";
+import { Routes } from "./index";
 
 const PATH_VALIDATORS: {
-        [Key in keyof Endpoints]?: keyof typeof SCHEMAS;
-    } = {
-	"/routes": "UserRoutesRoutesRequest",
-	"/user/get": "RoutesUserGetRequest",
-	"/user/create": "RoutesUserCreateRequest",
-	"/post/create": "RoutesPostCreateRequest",
-	"/user/post/list": "RoutesUserPostListRequest",
-}
+    [Key in keyof Endpoints]?: keyof typeof SCHEMAS;
+} = {
+    "/routes": "RoutesRequest",
+    "/user/get": "UserGetRequest",
+    "/user/create": "UserCreateRequest",
+    "/post/create": "PostCreateRequest",
+    "/user/post/list": "UserPostListRequest",
+};
 
 export type Endpoints = {
-		"/routes": {
-            req: UserRoutes.RoutesRequest,
-            res: never,
-        },
-		"/user/list": {
-            req: never,
-            res: Routes.UserListResponse,
-        },
-		"/user/get": {
-            req: Routes.UserGetRequest,
-            res: Routes.UserGetResponse,
-        },
-		"/user/create": {
-            req: Routes.UserCreateRequest,
-            res: Routes.UserCreateResponse,
-        },
-		"/post/create": {
-            req: Routes.PostCreateRequest,
-            res: Routes.PostCreateResponse,
-        },
-		"/user/post/list": {
-            req: Routes.UserPostListRequest,
-            res: Routes.UserPostListResponse,
-        },
-}
-
-
+    "/routes": {
+        req: UserRoutes.RoutesRequest;
+        res: never;
+    };
+    "/user/list": {
+        req: never;
+        res: Routes.UserListResponse;
+    };
+    "/user/get": {
+        req: Routes.UserGetRequest;
+        res: Routes.UserGetResponse;
+    };
+    "/user/create": {
+        req: Routes.UserCreateRequest;
+        res: Routes.UserCreateResponse;
+    };
+    "/post/create": {
+        req: Routes.PostCreateRequest;
+        res: Routes.PostCreateResponse;
+    };
+    "/user/post/list": {
+        req: Routes.UserPostListRequest;
+        res: Routes.UserPostListResponse;
+    };
+};
 
 export class Client extends BaseClient<Endpoints> {
+    /**
+     * Fetches "/routes" from the server. (`Routes`)
+     */
+    public async routes(data: UserRoutes.RoutesRequest): Promise<void> {
+        await this.fetch("post", "/routes", data);
+    }
 
-        /**
-         * Fetches "/routes" from the server. (`Routes`)
-         */
-        public async routes(data: UserRoutes.RoutesRequest): Promise<void> {
-            await this.fetch("post", "/routes", data);
-        }
+    /**
+     * Validates `UserRoutes.RoutesRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+     */
+    public static validateRoutesRequest<Error extends string>(
+        data: UserRoutes.RoutesRequest,
+        settings: ValidationSettings = {}
+    ): ErrorType<UserRoutes.RoutesRequest, Error> | null {
+        return validate(SCHEMAS.RoutesRequest, data, settings);
+    }
 
+    /**
+     * Fetches "/user/list" from the server. (`UserList`)
+     */
+    public async userList(): Promise<Routes.UserListResponse> {
+        return await this.fetch("post", "/user/list");
+    }
 
-        /**
-         * Fetches "/user/list" from the server. (`UserList`)
-         */
-        public async userList(): Promise<Routes.UserListResponse> {
-            return await this.fetch("post", "/user/list");
-        }
+    /**
+     * Fetches "/user/get" from the server. (`UserGet`)
+     */
+    public async userGet(data: Routes.UserGetRequest): Promise<Routes.UserGetResponse> {
+        return await this.fetch("post", "/user/get", data);
+    }
 
+    /**
+     * Validates `Routes.UserGetRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+     */
+    public static validateUserGetRequest<Error extends string>(data: Routes.UserGetRequest, settings: ValidationSettings = {}): ErrorType<Routes.UserGetRequest, Error> | null {
+        return validate(SCHEMAS.UserGetRequest, data, settings);
+    }
 
-        /**
-         * Fetches "/user/get" from the server. (`UserGet`)
-         */
-        public async userGet(data: Routes.UserGetRequest): Promise<Routes.UserGetResponse> {
-            return await this.fetch("post", "/user/get", data);
-        }
+    /**
+     * Fetches "/user/create" from the server. (`UserCreate`)
+     */
+    public async userCreate(data: Routes.UserCreateRequest): Promise<Routes.UserCreateResponse> {
+        return await this.fetch("post", "/user/create", data);
+    }
 
+    /**
+     * Validates `Routes.UserCreateRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+     */
+    public static validateUserCreateRequest<Error extends string>(
+        data: Routes.UserCreateRequest,
+        settings: ValidationSettings = {}
+    ): ErrorType<Routes.UserCreateRequest, Error> | null {
+        return validate(SCHEMAS.UserCreateRequest, data, settings);
+    }
 
-        /**
-         * Fetches "/user/create" from the server. (`UserCreate`)
-         */
-        public async userCreate(data: Routes.UserCreateRequest): Promise<Routes.UserCreateResponse> {
-            return await this.fetch("post", "/user/create", data);
-        }
+    /**
+     * Fetches "/post/create" from the server. (`PostCreate`)
+     */
+    public async postCreate(data: Routes.PostCreateRequest): Promise<Routes.PostCreateResponse> {
+        return await this.fetch("post", "/post/create", data);
+    }
 
+    /**
+     * Validates `Routes.PostCreateRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+     */
+    public static validatePostCreateRequest<Error extends string>(
+        data: Routes.PostCreateRequest,
+        settings: ValidationSettings = {}
+    ): ErrorType<Routes.PostCreateRequest, Error> | null {
+        return validate(SCHEMAS.PostCreateRequest, data, settings);
+    }
 
-        /**
-         * Fetches "/post/create" from the server. (`PostCreate`)
-         */
-        public async postCreate(data: Routes.PostCreateRequest): Promise<Routes.PostCreateResponse> {
-            return await this.fetch("post", "/post/create", data);
-        }
+    /**
+     * Fetches "/user/post/list" from the server. (`UserPostList`)
+     */
+    public async userPostList(data: Routes.UserPostListRequest): Promise<Routes.UserPostListResponse> {
+        return await this.fetch("post", "/user/post/list", data);
+    }
 
-
-        /**
-         * Fetches "/user/post/list" from the server. (`UserPostList`)
-         */
-        public async userPostList(data: Routes.UserPostListRequest): Promise<Routes.UserPostListResponse> {
-            return await this.fetch("post", "/user/post/list", data);
-        }
-
-
-        /**
-         * Validates `UserRoutes.RoutesRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-         */
-        public static validateUserRoutesRoutesRequest<Error extends string>(data: UserRoutes.RoutesRequest, context?: any, settings: ValidationSettings = {}): ErrorType<UserRoutes.RoutesRequest, Error> | null {
-            return validate(SCHEMAS.UserRoutesRoutesRequest, data, context, settings);
-        }
-
-
-        /**
-         * Validates `Routes.UserGetRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-         */
-        public static validateRoutesUserGetRequest<Error extends string>(data: Routes.UserGetRequest, context?: any, settings: ValidationSettings = {}): ErrorType<Routes.UserGetRequest, Error> | null {
-            return validate(SCHEMAS.RoutesUserGetRequest, data, context, settings);
-        }
-
-
-        /**
-         * Validates `Routes.UserCreateRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-         */
-        public static validateRoutesUserCreateRequest<Error extends string>(data: Routes.UserCreateRequest, context?: any, settings: ValidationSettings = {}): ErrorType<Routes.UserCreateRequest, Error> | null {
-            return validate(SCHEMAS.RoutesUserCreateRequest, data, context, settings);
-        }
-
-
-        /**
-         * Validates `UserWithoutId` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-         */
-        public static validateUserWithoutId<Error extends string>(data: UserWithoutId, context?: any, settings: ValidationSettings = {}): ErrorType<UserWithoutId, Error> | null {
-            return validate(SCHEMAS.UserWithoutId, data, context, settings);
-        }
-
-
-        /**
-         * Validates `Routes.PostCreateRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-         */
-        public static validateRoutesPostCreateRequest<Error extends string>(data: Routes.PostCreateRequest, context?: any, settings: ValidationSettings = {}): ErrorType<Routes.PostCreateRequest, Error> | null {
-            return validate(SCHEMAS.RoutesPostCreateRequest, data, context, settings);
-        }
-
-
-        /**
-         * Validates `Routes.UserPostListRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-         */
-        public static validateRoutesUserPostListRequest<Error extends string>(data: Routes.UserPostListRequest, context?: any, settings: ValidationSettings = {}): ErrorType<Routes.UserPostListRequest, Error> | null {
-            return validate(SCHEMAS.RoutesUserPostListRequest, data, context, settings);
-        }
-
-
-        /**
-         * Validates `Date` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-         */
-        public static validateDate<Error extends string>(data: Date, context?: any, settings: ValidationSettings = {}): ErrorType<Date, Error> | null {
-            return validate(SCHEMAS.Date, data, context, settings);
-        }
-
-
-        /**
-         * Validates `Gender` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-         */
-        public static validateGender<Error extends string>(data: Gender, context?: any, settings: ValidationSettings = {}): ErrorType<Gender, Error> | null {
-            return validate(SCHEMAS.Gender, data, context, settings);
-        }
+    /**
+     * Validates `Routes.UserPostListRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+     */
+    public static validateUserPostListRequest<Error extends string>(
+        data: Routes.UserPostListRequest,
+        settings: ValidationSettings = {}
+    ): ErrorType<Routes.UserPostListRequest, Error> | null {
+        return validate(SCHEMAS.UserPostListRequest, data, settings);
+    }
 }
 
 const SCHEMAS = {
-    "UserRoutesRoutesRequest": {
-        "type": "isObject",
-        "schema": {
-            "name": {
-                "type": "isType",
-                "value": "string"
-            }
-        }
-    },
-    "RoutesUserGetRequest": {
-        "type": "isObject",
-        "schema": {
-            "userId": {
-                "type": "isType",
-                "value": "number"
-            }
-        }
-    },
-    "RoutesUserCreateRequest": {
-        "type": "and",
-        "schemas": [
-            {
-                "type": "isObject",
-                "schema": {
-                    "user": {
-                        "type": "ref",
-                        "value": "UserWithoutId"
-                    }
-                }
+    RoutesRequest: {
+        type: "objectLiteral",
+        fields: {
+            name: {
+                type: "string",
             },
-            {
-                "type": "function",
-                "name": "Validation.validatePostPostRequest"
-            }
-        ]
+        },
     },
-    "UserWithoutId": {
-        "type": "and",
-        "schemas": [
-            {
-                "type": "isObject",
-                "schema": {
-                    "email": {
-                        "type": "isType",
-                        "value": "string"
+    UserGetRequest: {
+        type: "objectLiteral",
+        fields: {
+            userId: {
+                type: "number",
+            },
+        },
+    },
+    UserCreateRequest: {
+        type: "objectLiteral",
+        fields: {
+            user: {
+                type: "ref",
+                name: "UserWithoutId",
+            },
+        },
+    },
+    UserWithoutId: {
+        type: "objectLiteral",
+        fields: {
+            email: {
+                type: "string",
+            },
+            password: {
+                type: "string",
+            },
+            birthDate: {
+                type: "never",
+            },
+            gender: {
+                type: "or",
+                schemas: [
+                    {
+                        type: "stringLiteral",
+                        value: "male",
                     },
-                    "password": {
-                        "type": "isType",
-                        "value": "string"
+                    {
+                        type: "stringLiteral",
+                        value: "female",
                     },
-                    "birthDate": {
-                        "type": "ref",
-                        "value": "Date"
-                    },
-                    "gender": {
-                        "type": "ref",
-                        "value": "Gender"
-                    }
-                }
+                ],
             },
-            {
-                "type": "function",
-                "name": "Validation.validateUserWithoutId"
-            }
-        ]
+        },
     },
-    "RoutesPostCreateRequest": {
-        "type": "isObject",
-        "schema": {
-            "title": {
-                "type": "isType",
-                "value": "string"
+    PostCreateRequest: {
+        type: "objectLiteral",
+        fields: {
+            title: {
+                type: "string",
             },
-            "content": {
-                "type": "isType",
-                "value": "string"
-            }
-        }
-    },
-    "RoutesUserPostListRequest": {
-        "type": "isObject",
-        "schema": {
-            "userId": {
-                "type": "isType",
-                "value": "number"
-            }
-        }
-    },
-    "Date": {
-        "type": "and",
-        "schemas": [
-            {
-                "type": "true"
+            content: {
+                type: "string",
             },
-            {
-                "type": "function",
-                "name": "Validation.validateDate"
-            }
-        ]
+        },
     },
-    "Gender": {
-        "type": "and",
-        "schemas": [
-            {
-                "type": "true"
+    UserPostListRequest: {
+        type: "objectLiteral",
+        fields: {
+            userId: {
+                type: "number",
             },
-            {
-                "type": "function",
-                "name": "Validation.validateGender"
-            }
-        ]
-    }
+        },
+    },
 } as const;
-
-const CUSTOM_VALIDATORS = {
-	"Validation.validatePostPostRequest": Validation.validatePostPostRequest,
-	"Validation.validateUserWithoutId": Validation.validateUserWithoutId,
-	"Validation.validateDate": Validation.validateDate,
-	"Validation.validateGender": Validation.validateGender
-}
-    
