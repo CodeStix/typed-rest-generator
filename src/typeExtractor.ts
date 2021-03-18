@@ -101,6 +101,7 @@ export function createSchemaForType(type: ts.Type, checker: ts.TypeChecker, othe
             return createStringSchema(customProps);
         case ts.TypeFlags.Number:
             return createNumberSchema(customProps);
+        case ts.TypeFlags.Union | ts.TypeFlags.Boolean:
         case ts.TypeFlags.Boolean:
             return createNormalSchema(customProps, { type: "boolean" });
         case ts.TypeFlags.Never:

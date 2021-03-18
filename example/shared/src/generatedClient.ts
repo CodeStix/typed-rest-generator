@@ -259,11 +259,15 @@ import { Routes } from "./index"
 
 const PATH_VALIDATORS: {
         [Key in keyof Endpoints]?: keyof typeof SCHEMAS;
-    } = {"/routes":"RoutesRequest","/user/get":"UserGetRequest","/user/create":"UserCreateRequest"}
+    } = {"/routes":"RoutesRequest","/update/event":"UpdateEventRequest","/user/get":"UserGetRequest","/user/create":"UserCreateRequest"}
 
 export type Endpoints = {
 		"/routes": {
             req: UserRoutes.RoutesRequest,
+            res: never,
+        },
+		"/update/event": {
+            req: Routes.UpdateEventRequest,
             res: never,
         },
 		"/user/list": {
@@ -297,6 +301,22 @@ export class Client extends BaseClient<Endpoints> {
              */
             public static validateRoutesRequest<Error extends string>(data: UserRoutes.RoutesRequest, settings: ValidationSettings = {}): ErrorType<UserRoutes.RoutesRequest, Error> | null {
                 return validate(SCHEMAS.RoutesRequest, data, settings);
+            }
+
+
+        /**
+         * Fetches "/update/event" from the server. (`UpdateEvent`)
+         */
+        public async updateEvent(data: Routes.UpdateEventRequest): Promise<void> {
+            await this.fetch("post", "/update/event", data);
+        }
+
+
+            /**
+             * Validates `Routes.UpdateEventRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+             */
+            public static validateUpdateEventRequest<Error extends string>(data: Routes.UpdateEventRequest, settings: ValidationSettings = {}): ErrorType<Routes.UpdateEventRequest, Error> | null {
+                return validate(SCHEMAS.UpdateEventRequest, data, settings);
             }
 
 
@@ -346,6 +366,49 @@ const SCHEMAS = {
         "fields": {
             "name": {
                 "type": "string"
+            }
+        }
+    },
+    "UpdateEventRequest": {
+        "type": "objectLiteral",
+        "fields": {
+            "event": {
+                "type": "ref",
+                "name": "Event"
+            },
+            "notifyUsers": {
+                "type": "boolean"
+            }
+        }
+    },
+    "Event": {
+        "type": "objectLiteral",
+        "fields": {
+            "id": {
+                "type": "string"
+            },
+            "title": {
+                "type": "string"
+            },
+            "description": {
+                "type": "string"
+            },
+            "testId": {
+                "type": "or",
+                "schemas": [
+                    {
+                        "type": "undefined"
+                    },
+                    {
+                        "type": "number"
+                    }
+                ]
+            },
+            "createdTimeStamp": {
+                "type": "number"
+            },
+            "notifiedUsers": {
+                "type": "boolean"
             }
         }
     },

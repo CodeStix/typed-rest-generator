@@ -1,7 +1,21 @@
 import { Client, ErrorMap, ErrorType } from "./generatedClient";
 import { User, Gender, Post } from "./generatedPrisma";
 
+export interface Event {
+    id: string;
+    title: string;
+    description: string;
+    testId?: number;
+    createdTimeStamp: number;
+    notifiedUsers: boolean;
+}
+
 export namespace Routes {
+    export interface UpdateEventRequest {
+        event: Event;
+        notifyUsers: boolean;
+    }
+
     export interface UserListResponse {
         users: User[];
     }
