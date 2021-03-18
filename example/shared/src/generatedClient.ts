@@ -15,13 +15,14 @@ import type p from "qs";
 
 export function withValidator(path: keyof Endpoints) {
     return (req: any, res: any, next: any) => {
-        let val = PATH_VALIDATORS[path];
-        if (!val) return next();
-        let err = validate(SCHEMAS[val], req.body, { abortEarly: true, otherTypes: SCHEMAS });
-        if (err === null) {
+        let validatorName = PATH_VALIDATORS[path];
+        if (!validatorName) return next();
+        let [e, v] = validate(SCHEMAS[validatorName], req.body, { abortEarly: true, otherTypes: SCHEMAS });
+        if (e === null) {
+            req.body = v;
             return next();
         } else {
-            return res.status(406).json(err);
+            return res.status(406).json(e);
         }
     };
 }
@@ -97,34 +98,39 @@ export type ErrorMap<T, Error = string> = {
 export interface ValidationSettings {
     otherTypes?: Types;
     abortEarly?: boolean;
-    maxStringLength?: number;
+    defaultMaxStringLength?: number;
+    unknownKeyMode?: "delete" | "error";
 }
 
-export function validate<T, Error extends string = string>(schema: TypeSchema, value: any, settings: ValidationSettings): ErrorType<T, Error> | null {
+export function validate<T extends any, Error extends string = string>(
+    schema: TypeSchema,
+    value: T,
+    settings: ValidationSettings
+): [errors: ErrorType<T, Error> | null, sanitizedValue: T | undefined] {
     switch (schema.type) {
         case "never":
         case "unknown":
-            return "this value should not exist" as any;
+            return ["this value should not exist" as Error, undefined];
         case "any":
-            return null;
+            return [null, value];
         case "number":
-            if (typeof value !== "number") return "must be of type `number`" as any;
-            if (schema.min && value < schema.min) return schema.minMessage ?? ("must be higher" as any);
-            if (schema.max && value > schema.max) return schema.maxMessage ?? ("must be lower" as any);
-            return null;
+            if (typeof value !== "number") return ["must be of type `number`" as Error, undefined];
+            if (schema.min && value < schema.min) return [(schema.minMessage ?? "must be higher") as Error, undefined];
+            if (schema.max && value > schema.max) return [(schema.maxMessage ?? "must be lower") as Error, undefined];
+            return [null, value];
         case "string":
-            if (typeof value !== "string") return "must be of type `string`" as any;
-            if (schema.min && value.length < schema.min) return schema.minMessage ?? ("must be longer" as any);
-            let max = schema.max ?? settings.maxStringLength;
-            if (max && value.length > max) return schema.maxMessage ?? ("must be shorter" as any);
-            if (schema.regex && value.match(schema.regex) === null) return schema.regexMessage ?? ("does not match regex" as any);
-            return null;
+            if (typeof value !== "string") return ["must be of type `string`" as Error, undefined];
+            if (schema.min && value.length < schema.min) return [(schema.minMessage ?? "must be longer") as Error, undefined];
+            let max = schema.max ?? settings.defaultMaxStringLength;
+            if (max && value.length > max) return [(schema.maxMessage ?? "must be shorter") as Error, undefined];
+            if (schema.regex && value.match(schema.regex) === null) return [(schema.regexMessage ?? "does not match regex") as Error, undefined];
+            return [null, value];
         case "boolean":
         case "object":
         case "undefined":
-            return typeof value === schema.type ? null : (`must be of type \`${schema.type}\`` as any);
+            return typeof value === schema.type ? [null, value] : [`must be of type \`${schema.type}\`` as Error, undefined];
         case "null":
-            return value === null ? null : ("must be `null`" as any);
+            return value === null ? [null, value] : ["must be `null`" as Error, undefined];
         case "ref":
             let sch = settings.otherTypes?.[schema.name];
             if (!sch) throw new Error(`Schema for type \`${schema.name}\` was not found.`);
@@ -132,66 +138,71 @@ export function validate<T, Error extends string = string>(schema: TypeSchema, v
         case "stringLiteral":
         case "booleanLiteral":
         case "numberLiteral":
-            return value === schema.value ? null : (`must have value \`${schema.value}\`` as any);
-
+            return value === schema.value ? [null, value] : [`must have value \`${schema.value}\`` as Error, undefined];
         case "or": {
             let err: ErrorType<T, Error>[] = [];
             for (let i = 0; i < schema.schemas.length; i++) {
                 let sch = schema.schemas[i];
-                let res = validate<T, Error>(sch, value, settings);
-                if (res === null) return null;
-                err.push(res);
+                let [r, v] = validate<T, Error>(sch, value, settings);
+                if (r === null) return [r, v];
+                err.push(r);
             }
-            return err.join(", ") as any;
+            return [(err.join(", ") || "invalid or") as Error, undefined];
         }
         case "array": {
-            if (!Array.isArray(value)) return "invalid array" as any;
-            if (schema.min && value.length < schema.min) return schema.minMessage ?? ("array too short" as any);
-            if (schema.max && value.length > schema.max) return schema.maxMessage ?? ("array too long" as any);
+            if (!Array.isArray(value)) return ["invalid array" as Error, undefined];
+            if (schema.min && value.length < schema.min) return [(schema.minMessage ?? "array too short") as Error, undefined];
+            if (schema.max && value.length > schema.max) return [(schema.maxMessage ?? "array too long") as Error, undefined];
             let err: ErrorMap<T, Error> = {};
+            let copy = new Array(value.length);
             for (let i = 0; i < value.length; i++) {
-                let res = validate(schema.itemType, value[i], settings);
+                let [res, val] = validate(schema.itemType, value[i], settings);
+                copy[i] = val;
                 if (res !== null) {
-                    err[i as keyof T] = res as any;
-                    if (settings.abortEarly) return err as any;
+                    err[i as keyof T] = res as Error;
+                    if (settings.abortEarly) return [err as any, undefined];
                 }
             }
-            return Object.keys(err).length > 0 ? (err as any) : null;
+            return Object.keys(err).length > 0 ? [err as any, undefined] : [null, copy as any];
         }
         case "objectLiteral": {
-            if (typeof value !== "object" || value === null) return "invalid object" as any;
-            if (Object.keys(value).some((e) => !(e in schema.fields))) return "object contains unknown keys" as any;
+            if (typeof value !== "object" || value === null) return ["invalid object" as Error, undefined];
+            if (settings.unknownKeyMode === "error" && Object.keys(value as any).some((e) => !(e in schema.fields))) return ["object contains unknown keys" as Error, undefined];
             let err: ErrorMap<T, Error> = {};
             let keys = Object.keys(schema.fields);
+            let copy: any = {};
             for (let i = 0; i < keys.length; i++) {
                 let key = keys[i];
-                let res = validate(schema.fields[key], value[key], settings);
+                let [res, val] = validate(schema.fields[key], (value as any)[key], settings);
+                copy[key] = val;
                 if (res !== null) {
-                    err[key as keyof T] = res as any;
-                    if (settings.abortEarly) return err as any;
+                    err[key as keyof T] = res as Error;
+                    if (settings.abortEarly) return [err as any, undefined];
                 }
             }
-            return Object.keys(err).length > 0 ? (err as any) : null;
+            return Object.keys(err).length > 0 ? [err as any, undefined] : [null, copy];
         }
         case "tuple": {
-            if (!Array.isArray(value) || value.length > schema.itemTypes.length) return "invalid tuple" as any;
+            if (!Array.isArray(value) || value.length > schema.itemTypes.length) return ["invalid tuple" as Error, undefined];
             let err: ErrorMap<T, Error> = {};
+            let copy = new Array(value.length);
             for (let i = 0; i < schema.itemTypes.length; i++) {
-                let res = validate(schema.itemTypes[i], value[i], settings);
+                let [res, val] = validate(schema.itemTypes[i], value[i], settings);
+                copy[i] = val;
                 if (res !== null) {
-                    err[i as keyof T] = res as any;
-                    if (settings.abortEarly) return err as any;
+                    err[i as keyof T] = res as Error;
+                    if (settings.abortEarly) return [err as any, undefined];
                 }
             }
-            return Object.keys(err).length > 0 ? (err as any) : null;
+            return Object.keys(err).length > 0 ? [err as any, undefined] : [null, copy as any];
         }
         case "date": {
-            if (value instanceof Date) return null;
+            if (value instanceof Date) return [null, value];
             if (typeof value === "string" || typeof value === "number") {
                 let date = new Date(value);
-                return isNaN(date.getTime()) ? ("invalid date string" as any) : null;
+                return isNaN(date.getTime()) ? ["invalid date" as Error, undefined] : [null, date as T];
             } else {
-                return "invalid date format" as any;
+                return ["invalid date" as Error, undefined];
             }
         }
     }
@@ -229,7 +240,7 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
     }
 
     public async fetch<P extends keyof Endpoints>(method: string, url: P, body?: Endpoints[P]["req"]): Promise<Endpoints[P]["res"]> {
-        let res = await fetch(url as string, {
+        let res = await fetch((this.settings.path! + url) as string, {
             method,
             body: typeof body === "object" ? JSON.stringify(body) : null,
             headers: { "Content-Type": "application/json" },
@@ -293,8 +304,8 @@ export class Client extends BaseClient<Endpoints> {
             /**
              * Validates `UserRoutes.RoutesRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
              */
-            public static validateRoutesRequest<Error extends string>(data: UserRoutes.RoutesRequest, settings: ValidationSettings = { otherTypes: SCHEMAS }): ErrorType<UserRoutes.RoutesRequest, Error> | null {
-                return validate(SCHEMAS.RoutesRequest, data, settings);
+            public static validateRoutesRequest<Error extends string>(data: UserRoutes.RoutesRequest, settings: ValidationSettings = { }): ErrorType<UserRoutes.RoutesRequest, Error> | null {
+                return validate<UserRoutes.RoutesRequest, Error>(SCHEMAS.RoutesRequest, data, { otherTypes: SCHEMAS, ...settings })[0];
             }
 
 
@@ -309,8 +320,8 @@ export class Client extends BaseClient<Endpoints> {
             /**
              * Validates `Routes.UpdateEventRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
              */
-            public static validateUpdateEventRequest<Error extends string>(data: Routes.UpdateEventRequest, settings: ValidationSettings = { otherTypes: SCHEMAS }): ErrorType<Routes.UpdateEventRequest, Error> | null {
-                return validate(SCHEMAS.UpdateEventRequest, data, settings);
+            public static validateUpdateEventRequest<Error extends string>(data: Routes.UpdateEventRequest, settings: ValidationSettings = { }): ErrorType<Routes.UpdateEventRequest, Error> | null {
+                return validate<Routes.UpdateEventRequest, Error>(SCHEMAS.UpdateEventRequest, data, { otherTypes: SCHEMAS, ...settings })[0];
             }
 
 
@@ -333,8 +344,8 @@ export class Client extends BaseClient<Endpoints> {
             /**
              * Validates `Routes.UserGetRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
              */
-            public static validateUserGetRequest<Error extends string>(data: Routes.UserGetRequest, settings: ValidationSettings = { otherTypes: SCHEMAS }): ErrorType<Routes.UserGetRequest, Error> | null {
-                return validate(SCHEMAS.UserGetRequest, data, settings);
+            public static validateUserGetRequest<Error extends string>(data: Routes.UserGetRequest, settings: ValidationSettings = { }): ErrorType<Routes.UserGetRequest, Error> | null {
+                return validate<Routes.UserGetRequest, Error>(SCHEMAS.UserGetRequest, data, { otherTypes: SCHEMAS, ...settings })[0];
             }
 
 
@@ -349,8 +360,8 @@ export class Client extends BaseClient<Endpoints> {
             /**
              * Validates `Routes.UserCreateRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
              */
-            public static validateUserCreateRequest<Error extends string>(data: Routes.UserCreateRequest, settings: ValidationSettings = { otherTypes: SCHEMAS }): ErrorType<Routes.UserCreateRequest, Error> | null {
-                return validate(SCHEMAS.UserCreateRequest, data, settings);
+            public static validateUserCreateRequest<Error extends string>(data: Routes.UserCreateRequest, settings: ValidationSettings = { }): ErrorType<Routes.UserCreateRequest, Error> | null {
+                return validate<Routes.UserCreateRequest, Error>(SCHEMAS.UserCreateRequest, data, { otherTypes: SCHEMAS, ...settings })[0];
             }
 }
 
@@ -436,8 +447,8 @@ const SCHEMAS = {
         "fields": {
             "userId": {
                 "type": "number",
-                "min": 100,
-                "minMessage": "Must be larger than 100"
+                "min": 0,
+                "minMessage": "Must be larger than 0"
             }
         }
     },

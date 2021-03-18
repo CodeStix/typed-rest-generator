@@ -142,8 +142,8 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, paths: PathT
             /**
              * Validates \`${usageName}\` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
              */
-            public static validate${name}<Error extends string>(data: ${usageName}, settings: ValidationSettings = { otherTypes: SCHEMAS }): ErrorType<${usageName}, Error> | null {
-                return validate(SCHEMAS.${name}, data, settings);
+            public static validate${name}<Error extends string>(data: ${usageName}, settings: ValidationSettings = { }): ErrorType<${usageName}, Error> | null {
+                return validate<${usageName}, Error>(SCHEMAS.${name}, data, { otherTypes: SCHEMAS, ...settings })[0];
             }`);
         }
     });
