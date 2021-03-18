@@ -79,7 +79,7 @@ export function followImport(node: ts.ImportSpecifier, typeChecker: ts.TypeCheck
     return type.aliasSymbol ?? type.symbol;
 }
 
-export function generatePackageContent(typeChecker: ts.TypeChecker, paths: PathTypes, outputStream: fs.WriteStream, outputDirectory: string) {
+export function generatePackageContent(typeChecker: ts.TypeChecker, paths: PathTypes, outputStream: fs.WriteStream, outputDirectory: string, version: string) {
     // Write default types
     outputStream.write(getDefaultTypes());
 
@@ -194,7 +194,10 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, paths: PathT
     outputStream.write(`
 ${endPointsTypings.join("")}
 
+const VERSION = "${version}";
+
 export class Client extends BaseClient<Endpoints> {
+    
 ${clientClassMethodImplementations.join("\n\n")}
 }
 

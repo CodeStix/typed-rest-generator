@@ -233,6 +233,10 @@ export interface ClientSettings {
 export class BaseClient<Endpoints extends EndpointsConstraint> {
     public readonly settings: ClientSettings;
 
+    public get version() {
+        return VERSION;
+    }
+
     public constructor(settings: ClientSettings = {}) {
         settings.path ||= "";
         if (settings.path.endsWith("/")) settings.path = settings.path.substring(0, settings.path.length - 1);

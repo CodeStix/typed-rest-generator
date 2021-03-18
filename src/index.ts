@@ -6,10 +6,11 @@ import path from "path";
 import { generatePackageContent, getRouteTypes, getRouteTypesFromRoutesNamespace, PathTypes } from "./generator";
 import { Command } from "commander";
 import chokidar from "chokidar";
+import pack from "../package.json";
 
 function main() {
-    let program = new Command("typed-rest-generator");
-    program.version("1.0.0");
+    let program = new Command(pack.name);
+    program.version(pack.version);
     program.requiredOption("-i --input <file>", "The .ts file containing request/response types.");
     program.option("-o --output <file>", "The destination file to generate. Will be overwritten.", "");
     program.option("-w --watch", "Watch the input file for changes.");
@@ -23,17 +24,17 @@ function main() {
 
     if (options.watch) {
         console.log("Watching for changes...");
-        execute(inputFile, outputFile, namespaceOnly);
+        execute(inputFile, outputFile, namespaceOnly, pack.version);
         let watchFiles = getProgramPaths(inputFile).filter((e) => e !== outputFile);
         chokidar.watch(watchFiles, {}).on("change", () => {
             try {
-                execute(inputFile, outputFile, namespaceOnly);
+                execute(inputFile, outputFile, namespaceOnly, pack.version);
             } catch (ex) {
                 console.error(ex);
             }
         });
     } else {
-        execute(inputFile, outputFile, namespaceOnly);
+        execute(inputFile, outputFile, namespaceOnly, pack.version);
     }
 }
 
@@ -52,7 +53,7 @@ function getCompilerOptions() {
     return ts.parseJsonConfigFileContent(compilerOptionsFile.config, ts.sys, "./").options;
 }
 
-function execute(inputFile: string, outputFile: string, onlyNamespace: boolean) {
+function execute(inputFile: string, outputFile: string, onlyNamespace: boolean, version: string) {
     console.log(`${inputFile} -> ${outputFile}`);
     let compilerOptions = getCompilerOptions();
     let typescriptProgram = ts.createProgram([inputFile], compilerOptions);
@@ -69,7 +70,7 @@ function execute(inputFile: string, outputFile: string, onlyNamespace: boolean) 
     });
 
     let output = fs.createWriteStream(outputFile);
-    generatePackageContent(checker, pathTypes, output, path.dirname(outputFile));
+    generatePackageContent(checker, pathTypes, output, path.dirname(outputFile), version);
     output.close();
 }
 

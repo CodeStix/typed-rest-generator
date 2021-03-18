@@ -233,6 +233,10 @@ export interface ClientSettings {
 export class BaseClient<Endpoints extends EndpointsConstraint> {
     public readonly settings: ClientSettings;
 
+    public get version() {
+        return VERSION;
+    }
+
     public constructor(settings: ClientSettings = {}) {
         settings.path ||= "";
         if (settings.path.endsWith("/")) settings.path = settings.path.substring(0, settings.path.length - 1);
@@ -291,7 +295,10 @@ export type Endpoints = {
 
 
 
+const VERSION = "1.0.10";
+
 export class Client extends BaseClient<Endpoints> {
+    
 
         /**
          * Fetches "/routes" from the server. (`Routes`)

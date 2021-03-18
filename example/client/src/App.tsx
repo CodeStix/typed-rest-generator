@@ -13,6 +13,8 @@ function App() {
     );
     const [users, setUsers] = useState<User[] | null>(null);
 
+    console.log(client.version);
+
     useEffect(() => {
         (async () => {
             setUsers((await client.userList()).users);
