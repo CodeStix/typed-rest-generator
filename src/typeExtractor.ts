@@ -36,6 +36,7 @@ export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeC
     let fullName = checker.typeToString(type);
     let sym = type.aliasSymbol ?? type.symbol;
     let isInline = sym.name === "__type";
+
     if (!isInline && sym.declarations![0].getSourceFile().fileName.includes("node_modules/typescript/")) {
         if (fullName === "Date") {
             return { type: "date" };

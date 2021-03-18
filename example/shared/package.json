@@ -5,7 +5,7 @@
   "types": "dist/index.d.ts",
   "license": "MIT",
   "scripts": {
-    "routes": "ts-node ../../src/index.ts -i src/index.ts ",
+    "routes": "ts-node ../../src/index.ts -i src/index.ts -n",
     "build": "tsc",
     "start": "tsc --watch"
   },

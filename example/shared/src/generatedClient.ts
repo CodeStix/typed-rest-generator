@@ -215,29 +215,8 @@ export class RateLimitError extends Error {
     }
 }
 
-export async function defaultFetcher(url: any, method: any, body: any) {
-    let res = await fetch(url, {
-        method,
-        body: typeof body === "object" ? JSON.stringify(body) : null,
-        headers: { "Content-Type": "application/json" },
-    });
-
-    if (res.status <= 400) {
-        return await res.json();
-    } else if (res.status === 406) {
-        throw new ValidationError("Validation error", await res.json());
-    } else if (res.status === 429) {
-        throw new RateLimitError("Rate limited");
-    } else if (res.status === 401) {
-        throw new Error(`Unauthorized. To implement authorization, override fetcher in the client settings.`);
-    } else {
-        throw new Error(`Could not fetch '${method}' (HTTP ${res.status}: ${res.statusText})`);
-    }
-}
-
 export interface ClientSettings {
     path?: string;
-    fetcher?: (url: string, method: string, body?: object) => Promise<any>;
 }
 
 export class BaseClient<Endpoints extends EndpointsConstraint> {
@@ -245,13 +224,28 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
 
     public constructor(settings: ClientSettings = {}) {
         settings.path ||= "";
-        settings.fetcher ||= defaultFetcher;
         if (settings.path.endsWith("/")) settings.path = settings.path.substring(0, settings.path.length - 1);
         this.settings = settings;
     }
 
-    public fetch<Path extends keyof Endpoints>(method: string, path: Path, body?: Endpoints[Path]["req"]): Promise<Endpoints[Path]["res"]> {
-        return this.settings.fetcher!(this.settings.path! + (path as string), method, body);
+    public async fetch<P extends keyof Endpoints>(method: string, url: P, body?: Endpoints[P]["req"]): Promise<Endpoints[P]["res"]> {
+        let res = await fetch(url as string, {
+            method,
+            body: typeof body === "object" ? JSON.stringify(body) : null,
+            headers: { "Content-Type": "application/json" },
+        });
+
+        if (res.status <= 400) {
+            return await res.json();
+        } else if (res.status === 406) {
+            throw new ValidationError("Validation error", await res.json());
+        } else if (res.status === 429) {
+            throw new RateLimitError("Rate limited");
+        } else if (res.status === 401) {
+            throw new Error(`Unauthorized. To implement authorization, override fetcher in the client settings.`);
+        } else {
+            throw new Error(`Could not fetch '${method}' (HTTP ${res.status}: ${res.statusText})`);
+        }
     }
 }
 import { UserRoutes } from "./userRoutes";
