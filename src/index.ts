@@ -3,7 +3,7 @@
 import ts from "byots";
 import fs from "fs";
 import path from "path";
-import { getFromSourceFile, generatePackageContent, PathTypes } from "./generator";
+import { generatePackageContent, getRouteTypes, getRouteTypesFromRoutesNamespace, PathTypes } from "./generator";
 import { Command } from "commander";
 import chokidar from "chokidar";
 
@@ -13,25 +13,27 @@ function main() {
     program.requiredOption("-i --input <file>", "The .ts file containing Routes/Validation namespaces.");
     program.option("-o --output <file>", "The destination file to generate. Will be overwritten.", "");
     program.option("-w --watch", "Watch the input file for changes.");
+    program.option("-n --namespace", "Look for route types in `Routes` namespaces.");
     program.parse(process.argv);
     let options = program.opts();
     let inputFile = options.input;
     let outputFile = options.output;
+    let namespaceOnly = options.namespace;
     if (!outputFile) outputFile = path.join(path.dirname(inputFile), "generatedClient.ts");
 
     if (options.watch) {
         console.log("Watching for changes...");
-        execute(inputFile, outputFile);
+        execute(inputFile, outputFile, namespaceOnly);
         let watchFiles = getProgramPaths(inputFile).filter((e) => e !== outputFile);
         chokidar.watch(watchFiles, {}).on("change", () => {
             try {
-                execute(inputFile, outputFile);
+                execute(inputFile, outputFile, namespaceOnly);
             } catch (ex) {
                 console.error(ex);
             }
         });
     } else {
-        execute(inputFile, outputFile);
+        execute(inputFile, outputFile, namespaceOnly);
     }
 }
 
@@ -50,22 +52,24 @@ function getCompilerOptions() {
     return ts.parseJsonConfigFileContent(compilerOptionsFile.config, ts.sys, "./").options;
 }
 
-function execute(inputFile: string, outputFile: string) {
+function execute(inputFile: string, outputFile: string, onlyNamespace: boolean) {
     console.log(`${inputFile} -> ${outputFile}`);
     let compilerOptions = getCompilerOptions();
     let typescriptProgram = ts.createProgram([inputFile], compilerOptions);
-    let methodTypes: PathTypes = {};
+    let checker = typescriptProgram.getTypeChecker();
+    let pathTypes: PathTypes = {};
 
     let files = typescriptProgram.getSourceFiles();
 
     files.forEach((f) => {
         if (f.fileName.includes("node_modules/")) return;
         console.log("File", path.relative(process.cwd(), f.fileName));
-        getFromSourceFile(typescriptProgram, f, methodTypes);
+        if (onlyNamespace) getRouteTypesFromRoutesNamespace(checker, f, pathTypes);
+        else getRouteTypes(checker, f, pathTypes);
     });
 
     let output = fs.createWriteStream(outputFile);
-    generatePackageContent(typescriptProgram.getTypeChecker(), methodTypes, output, path.dirname(outputFile));
+    generatePackageContent(checker, pathTypes, output, path.dirname(outputFile));
     output.close();
 }
 

@@ -33,9 +33,9 @@ function typeNameToPath(typeName: string) {
     );
 }
 
-export function getRouteTypes(node: ts.Node, typeChecker: ts.TypeChecker, paths: PathTypes) {
-    if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) {
-        let name = node.name.text;
+export function registerRouteType(node: ts.Node, typeChecker: ts.TypeChecker, paths: PathTypes, throwOnNoMatch?: boolean) {
+    if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node) || ts.isClassDeclaration(node)) {
+        let name = node.name!.text;
         let m;
         let regex = /^([a-zA-Z0-9_]+)(Response|Request)$/;
         if ((m = name.match(regex))) {
@@ -45,24 +45,27 @@ export function getRouteTypes(node: ts.Node, typeChecker: ts.TypeChecker, paths:
             paths[pathType] = {
                 ...paths[pathType],
                 [apiType]: {
-                    symbol: typeChecker.getSymbolAtLocation(node.name),
+                    symbol: typeChecker.getSymbolAtLocation(node.name!),
                 },
             };
-        } else {
+        } else if (throwOnNoMatch) {
             throw new Error(`Malformed route type name '${name}', please match '${regex.source}'`);
         }
-    } else {
+    } else if (throwOnNoMatch) {
         throw new Error(`Unsupported route type '${ts.SyntaxKind[node.kind]}' at line ${node.getSourceFile().fileName}:${node.pos}`);
     }
 }
 
-export function getFromSourceFile(program: ts.Program, file: ts.SourceFile, paths: PathTypes) {
-    let checker = program.getTypeChecker();
+export function getRouteTypes(checker: ts.TypeChecker, file: ts.SourceFile, paths: PathTypes) {
+    file.statements.forEach((stmt) => registerRouteType(stmt, checker, paths, false));
+}
+
+export function getRouteTypesFromRoutesNamespace(checker: ts.TypeChecker, file: ts.SourceFile, paths: PathTypes) {
     file.statements.forEach((stmt) => {
         if (ts.isModuleDeclaration(stmt)) {
             if (stmt.name.text.endsWith("Routes")) {
                 let body = stmt.body! as ts.ModuleBlock;
-                body.statements.forEach((routeType) => getRouteTypes(routeType, checker, paths));
+                body.statements.forEach((routeType) => registerRouteType(routeType, checker, paths, true));
             }
         }
     });
