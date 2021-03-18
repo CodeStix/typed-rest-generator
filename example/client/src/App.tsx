@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Client, Post, Routes, User, UserWithoutId } from "shared";
+import { Client, ErrorMap, Post, Routes, User, UserWithoutId } from "shared";
 import { FormError, FormInput, FormSelect, useForm } from "typed-react-form";
 
 let client = new Client({ path: "http://localhost:3002/" });
@@ -7,7 +7,7 @@ let client = new Client({ path: "http://localhost:3002/" });
 function App() {
     const form = useForm<Routes.UserCreateRequest>(
         { password: "", birthDate: new Date(), email: "", gender: "male" },
-        (data) => (Client.validateUserCreateRequest(data) as any) ?? {},
+        (data) => (Client.validateUserCreateRequest(data) as ErrorMap<Routes.UserCreateRequest>) ?? {},
         true,
         false
     );
@@ -54,7 +54,7 @@ function App() {
                     form.setState({ isSubmitting: true });
                     let res = await client.userCreate(form.values);
                     if (res.status === "error" && res.error && typeof res.error === "object") {
-                        form.setErrors(res.error as any);
+                        form.setErrors(res.error);
                     }
                     form.setState({ isSubmitting: false });
                 }}

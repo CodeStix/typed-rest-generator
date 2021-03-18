@@ -12,15 +12,8 @@ export type User = {
      */
     email: string;
     /**
-     * @v-min 5
+     * @v-min 1
      */
-    password: string;
-    birthDate: Date;
-    gender: Gender;
-};
-
-export type UserWithoutId = {
-    email: string;
     password: string;
     birthDate: Date;
     gender: Gender;

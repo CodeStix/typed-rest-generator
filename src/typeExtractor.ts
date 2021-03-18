@@ -1,4 +1,4 @@
-import ts from "byots";
+import ts, { breakIntoCharacterSpans } from "byots";
 import { symbolHasFlag, symbolFlagsToString, typeFlagsToString } from "./helpers";
 
 export type JSDocProps = {
@@ -7,22 +7,25 @@ export type JSDocProps = {
 export type Types = {
     [name: string]: TypeSchema;
 };
+export type NumberTypeSchema = { type: "number"; min?: number; max?: number; minMessage?: string; maxMessage?: string };
+export type StringTypeSchema = { type: "string"; min?: number; max?: number; regex?: string; minMessage?: string; maxMessage?: string; regexMessage?: string };
+export type ArrayTypeSchema = { type: "array"; itemType: TypeSchema; min?: number; max?: number; minMessage?: string; maxMessage?: string };
 export type TypeSchema =
     | { type: "or"; schemas: readonly TypeSchema[] }
     | { type: "ref"; name: string }
     | { type: "objectLiteral"; fields: Types }
-    | { type: "array"; itemType: TypeSchema; min?: number; max?: number }
+    | ArrayTypeSchema
     | { type: "tuple"; itemTypes: readonly TypeSchema[] }
     | { type: "undefined" }
     | { type: "null" }
-    | { type: "string"; min?: number; max?: number; regex?: string }
+    | StringTypeSchema
     | { type: "boolean" }
     | { type: "object" }
     | { type: "never" }
     | { type: "date" }
     | { type: "unknown" }
     | { type: "any" }
-    | { type: "number"; min?: number; max?: number }
+    | NumberTypeSchema
     | { type: "numberLiteral"; value: number }
     | { type: "stringLiteral"; value: string }
     | { type: "booleanLiteral"; value: boolean };
@@ -74,24 +77,19 @@ export function createSchemaForType(type: ts.Type, checker: ts.TypeChecker, othe
         case ts.TypeFlags.Object: {
             if (checker.isTupleType(type)) {
                 let tupleType = type as ts.TupleType;
-                return {
+                return createNormalSchema(customProps, {
                     type: "tuple",
                     itemTypes: tupleType.resolvedTypeArguments!.map((e) => createSchemaForType(e, checker, otherTypes, customProps)),
-                };
+                });
             } else if (checker.isArrayType(type)) {
                 let arrType = checker.getElementTypeOfArrayType(type)!;
-                return {
-                    type: "array",
-                    itemType: createSchemaForType(arrType, checker, otherTypes, customProps),
-                    min: "min" in customProps ? parseInt(customProps["min"]) : undefined,
-                    max: "max" in customProps ? parseInt(customProps["max"]) : undefined,
-                };
+                return createArraySchema(customProps, createSchemaForType(arrType, checker, otherTypes, customProps));
             } else if (
                 symbolHasFlag(type.symbol, ts.SymbolFlags.Interface) ||
                 symbolHasFlag(type.symbol, ts.SymbolFlags.TypeLiteral) ||
                 symbolHasFlag(type.symbol, ts.SymbolFlags.Class)
             ) {
-                return createSchemaForObjectType(type as ts.ObjectType, checker, otherTypes);
+                return createNormalSchema(customProps, createSchemaForObjectType(type as ts.ObjectType, checker, otherTypes));
             } else {
                 throw new Error(`Unsupported object type \`${symbolFlagsToString(type.symbol.flags)}\``);
             }
@@ -100,42 +98,31 @@ export function createSchemaForType(type: ts.Type, checker: ts.TypeChecker, othe
         case ts.TypeFlags.Union:
             return { type: "or", schemas: (type as ts.UnionType).types.map((e) => createSchemaForType(e, checker, otherTypes, customProps)) };
         case ts.TypeFlags.String:
-            let reg = customProps["regex"]?.trim();
-            if (reg && reg.startsWith("/") && reg.endsWith("/")) reg = reg.substring(1, reg.length - 2);
-            return {
-                type: "string",
-                min: "min" in customProps ? parseInt(customProps["min"]) : undefined,
-                max: "max" in customProps ? parseInt(customProps["max"]) : undefined,
-                regex: reg,
-            };
+            return createStringSchema(customProps);
         case ts.TypeFlags.Number:
-            return {
-                type: "number",
-                min: "min" in customProps ? parseInt(customProps["min"]) : undefined,
-                max: "max" in customProps ? parseInt(customProps["max"]) : undefined,
-            };
+            return createNumberSchema(customProps);
         case ts.TypeFlags.Boolean:
-            return { type: "boolean" };
+            return createNormalSchema(customProps, { type: "boolean" });
         case ts.TypeFlags.Never:
             console.warn(`A never type was found, this will always validate to false. \`${checker.typeToString(type)}\``);
-            return { type: "never" };
+            return createNormalSchema(customProps, { type: "never" });
         case ts.TypeFlags.Any:
             console.warn(`An any type was found, this will always validate to true. \`${checker.typeToString(type)}\``);
-            return { type: "any" };
+            return createNormalSchema(customProps, { type: "any" });
         case ts.TypeFlags.NumberLiteral:
-            return { type: "numberLiteral", value: (type as ts.NumberLiteralType).value };
+            return createNormalSchema(customProps, { type: "numberLiteral", value: (type as ts.NumberLiteralType).value });
         case ts.TypeFlags.StringLiteral:
-            return { type: "stringLiteral", value: (type as ts.StringLiteralType).value };
+            return createNormalSchema(customProps, { type: "stringLiteral", value: (type as ts.StringLiteralType).value });
         case ts.TypeFlags.BooleanLiteral:
-            return { type: "booleanLiteral", value: type.id === 17 }; // Better way?
+            return createNormalSchema(customProps, { type: "booleanLiteral", value: type.id === 17 }); // Better way?
         case ts.TypeFlags.Undefined:
-            return { type: "undefined" };
+            return createNormalSchema(customProps, { type: "undefined" });
         case ts.TypeFlags.Null:
-            return { type: "null" };
+            return createNormalSchema(customProps, { type: "null" });
         case ts.TypeFlags.Unknown:
-            return { type: "unknown" };
+            return createNormalSchema(customProps, { type: "unknown" });
         case ts.TypeFlags.NonPrimitive:
-            return { type: "object" };
+            return createNormalSchema(customProps, { type: "object" });
 
         case ts.TypeFlags.TypeParameter:
             throw new Error(`The type of generic \`${(type as ts.TypeParameter).symbol.name}\` must be known at build time.`);
@@ -154,4 +141,75 @@ export function createSchemaForTypeDeclaration(e: ts.InterfaceDeclaration | ts.C
     } else {
         throw new Error(`Unsupported declaration type \`${ts.NodeFlags[e.flags]}\``);
     }
+}
+
+function createStringSchema(customProps: JSDocProps): StringTypeSchema {
+    let schema: StringTypeSchema = { type: "string" };
+    Object.keys(customProps).forEach((prop) => {
+        let args = customProps[prop].split(" ");
+        switch (prop) {
+            case "min":
+                schema.min = parseInt(args[0]);
+                schema.minMessage = args.slice(1).join(" ") || undefined;
+                break;
+            case "max":
+                schema.max = parseInt(args[0]);
+                schema.maxMessage = args.slice(1).join(" ") || undefined;
+                break;
+            case "regex":
+                let arg = args[0];
+                schema.regex = arg.startsWith("/") && arg.endsWith("/") ? arg.substring(1, arg.length - 2) : arg;
+                schema.regexMessage = args.slice(1).join(" ") || undefined;
+                break;
+            default:
+                throw new Error(`string does not support validator \`@v-${prop}\``);
+        }
+    });
+    return schema;
+}
+
+function createNumberSchema(customProps: JSDocProps): NumberTypeSchema {
+    let schema: NumberTypeSchema = { type: "number" };
+    Object.keys(customProps).forEach((prop) => {
+        let args = customProps[prop].split(" ");
+        switch (prop) {
+            case "min":
+                schema.min = parseInt(args[0]);
+                schema.minMessage = args.slice(1).join(" ") || undefined;
+                break;
+            case "max":
+                schema.max = parseInt(args[0]);
+                schema.maxMessage = args.slice(1).join(" ") || undefined;
+                break;
+            default:
+                throw new Error(`number does not support validator \`@v-${prop}\``);
+        }
+    });
+    return schema;
+}
+
+function createArraySchema(customProps: JSDocProps, itemType: TypeSchema): ArrayTypeSchema {
+    let schema: ArrayTypeSchema = { type: "array", itemType };
+    Object.keys(customProps).forEach((prop) => {
+        let args = customProps[prop].split(" ");
+        switch (prop) {
+            case "min":
+                schema.min = parseInt(args[0]);
+                schema.minMessage = args.slice(1).join(" ") || undefined;
+                break;
+            case "max":
+                schema.max = parseInt(args[0]);
+                schema.maxMessage = args.slice(1).join(" ") || undefined;
+                break;
+            default:
+                throw new Error(`array does not support validator \`@v-${prop}\``);
+        }
+    });
+    return schema;
+}
+
+function createNormalSchema(customProps: JSDocProps, schema: TypeSchema): TypeSchema {
+    let keys = Object.keys(customProps);
+    if (keys.length !== 0) throw new Error(`${schema.type} does not support validator \`@v-${keys[0]}\``);
+    return schema;
 }

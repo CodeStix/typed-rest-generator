@@ -1,5 +1,5 @@
 import { Client, ErrorMap, ErrorType } from "./generatedClient";
-import { User, UserWithoutId, Gender, Post } from "./generatedPrisma";
+import { User, Gender, Post } from "./generatedPrisma";
 
 export namespace Routes {
     export interface UserListResponse {
@@ -19,7 +19,7 @@ export namespace Routes {
     export type UserCreateResponse =
         | {
               status: "error";
-              error: ErrorType<UserWithoutId>;
+              error: ErrorType<Omit<User, "id">>;
           }
         | {
               status: "ok";

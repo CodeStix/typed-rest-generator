@@ -66,23 +66,25 @@ declare module "express-serve-static-core" {
 export type Types = {
     [name: string]: TypeSchema;
 };
-
+export type NumberTypeSchema = { type: "number"; min?: number; max?: number; minMessage?: string; maxMessage?: string };
+export type StringTypeSchema = { type: "string"; min?: number; max?: number; regex?: string; minMessage?: string; maxMessage?: string; regexMessage?: string };
+export type ArrayTypeSchema = { type: "array"; itemType: TypeSchema; min?: number; max?: number; minMessage?: string; maxMessage?: string };
 export type TypeSchema =
     | { type: "or"; schemas: readonly TypeSchema[] }
     | { type: "ref"; name: string }
     | { type: "objectLiteral"; fields: Types }
-    | { type: "array"; itemType: TypeSchema; min?: number; max?: number }
+    | ArrayTypeSchema
     | { type: "tuple"; itemTypes: readonly TypeSchema[] }
     | { type: "undefined" }
     | { type: "null" }
-    | { type: "string"; min?: number; max?: number; regex?: string }
+    | StringTypeSchema
     | { type: "boolean" }
     | { type: "object" }
-    | { type: "date" }
     | { type: "never" }
+    | { type: "date" }
     | { type: "unknown" }
     | { type: "any" }
-    | { type: "number"; min?: number; max?: number }
+    | NumberTypeSchema
     | { type: "numberLiteral"; value: number }
     | { type: "stringLiteral"; value: string }
     | { type: "booleanLiteral"; value: boolean };
