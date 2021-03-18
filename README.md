@@ -6,24 +6,22 @@ The ultimate cli tool to generate typescript code that connects your client-side
 
 ## How it works
 
-1. Create a typescript file (in a shared package between your client and server) containing your routes in a _Routes_ namespace:
+1. Create a typescript file (in a shared package between your client and server) containing your routes:
 
     ```ts
     // routes.ts
     // Must end with Routes
-    export namespace UserRoutes {
 
-        // Must end with Request
-        export UserCreateRequest {
-            name: string;
-            email: string;
-            password: string;
-        }
+    // Must end with Request
+    export UserCreateRequest {
+        name: string;
+        email: string;
+        password: string;
+    }
 
-        // Must end with Response
-        export UserCreateResponse {
-            user: User;
-        }
+    // Must end with Response
+    export UserCreateResponse {
+        user: User;
     }
     ```
 
@@ -32,7 +30,7 @@ The ultimate cli tool to generate typescript code that connects your client-side
     export * from "./routes.ts";
     ```
 
-2. Run the cli tool: `npx typed-rest-generator -i index.ts -o generatedClient.ts`. The tool will look for the _Routes_ namespaces and will generate a script containing validators, the `Client` class and the `typedRouter` helper.
+2. Run the cli tool: `npx typed-rest-generator -i index.ts -o generatedClient.ts`. The tool will look for the request/response types and will generate a script containing validators, the `Client` class and the `withValidator` helper.
 3. The generated code can be used in the following ways:
 
     **Shared package**
@@ -60,15 +58,14 @@ The ultimate cli tool to generate typescript code that connects your client-side
 
     ```ts
     import express from "express";
-    import { typedRouter } from "shared";
+    import { withValidator } from "shared";
 
     // Wrap express with typedRouter to enable type-checking
-    const app = typedRouter(express());
+    const app = express();
 
     // Even the path is type-checked
-    app.typed("/user/create", (req, res, next) => {
-        // A validator for UserCreateRequest was automatically generated and tested on req.body.
-
+    // A validator for UserCreateRequest was automatically generated.
+    app.post("/user/create", withValidator("/user/create"), (req, res, next) => {
         // req and res are type checked!
         console.log(req.body.name);
 
@@ -83,8 +80,9 @@ Usage: typed-rest-generator [options]
 
 Options:
   -V, --version       output the version number
-  -i --input <file>   The input .ts file.
-  -o --output <file>  The destination file to generate. Will be overwritten. (default: "generatedClient.ts")
+  -i --input <file>   The .ts file containing request/response types.
+  -o --output <file>  The destination file to generate. Will be overwritten. (default: "")
   -w --watch          Watch the input file for changes.
+  -n --namespace      Look for route types in `Routes` namespaces.
   -h, --help          display help for command
 ```

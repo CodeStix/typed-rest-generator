@@ -10,7 +10,7 @@ import chokidar from "chokidar";
 function main() {
     let program = new Command("typed-rest-generator");
     program.version("1.0.0");
-    program.requiredOption("-i --input <file>", "The .ts file containing Routes/Validation namespaces.");
+    program.requiredOption("-i --input <file>", "The .ts file containing request/response types.");
     program.option("-o --output <file>", "The destination file to generate. Will be overwritten.", "");
     program.option("-w --watch", "Watch the input file for changes.");
     program.option("-n --namespace", "Look for route types in `Routes` namespaces.");
