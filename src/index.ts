@@ -6,11 +6,12 @@ import path from "path";
 import { generatePackageContent, getRouteTypes, getRouteTypesFromRoutesNamespace, PathTypes } from "./generator";
 import { Command } from "commander";
 import chokidar from "chokidar";
-import pack from "../package.json";
+
+const VERSION = "1.0.12";
 
 function main() {
-    let program = new Command(pack.name);
-    program.version(pack.version);
+    let program = new Command("typed-rest-generator");
+    program.version(VERSION);
     program.requiredOption("-i --input <file>", "The .ts file containing request/response types.");
     program.option("-o --output <file>", "The destination file to generate. Will be overwritten.", "");
     program.option("-w --watch", "Watch the input file for changes.");
@@ -24,17 +25,17 @@ function main() {
 
     if (options.watch) {
         console.log("Watching for changes...");
-        execute(inputFile, outputFile, namespaceOnly, pack.version);
+        execute(inputFile, outputFile, namespaceOnly, VERSION);
         let watchFiles = getProgramPaths(inputFile).filter((e) => e !== outputFile);
         chokidar.watch(watchFiles, {}).on("change", () => {
             try {
-                execute(inputFile, outputFile, namespaceOnly, pack.version);
+                execute(inputFile, outputFile, namespaceOnly, VERSION);
             } catch (ex) {
                 console.error(ex);
             }
         });
     } else {
-        execute(inputFile, outputFile, namespaceOnly, pack.version);
+        execute(inputFile, outputFile, namespaceOnly, VERSION);
     }
 }
 
