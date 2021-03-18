@@ -17,7 +17,7 @@ export function withValidator(path: keyof Endpoints) {
     return (req: any, res: any, next: any) => {
         let val = PATH_VALIDATORS[path];
         if (!val) return next();
-        let err = validate(SCHEMAS[val], req.body, { abortEarly: true });
+        let err = validate(SCHEMAS[val], req.body, { abortEarly: true, otherTypes: SCHEMAS });
         if (err === null) {
             return next();
         } else {
@@ -242,439 +242,442 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
         } else if (res.status === 429) {
             throw new RateLimitError("Rate limited");
         } else if (res.status === 401) {
-            throw new Error(`Unauthorized. To implement authorization, override fetcher in the client settings.`);
+            throw new Error(`Unauthorized. To implement authorization and custom fetch logic, extend the Client class and override fetch.`);
         } else {
             throw new Error(`Could not fetch '${method}' (HTTP ${res.status}: ${res.statusText})`);
         }
     }
 }
-import { UserRoutes } from "./userRoutes";
-import { Routes } from "./index";
+import { UserRoutes } from "./userRoutes"
+import { Routes } from "./index"
 
 const PATH_VALIDATORS: {
-    [Key in keyof Endpoints]?: keyof typeof SCHEMAS;
-} = { "/routes": "RoutesRequest", "/update/event": "UpdateEventRequest", "/user/get": "UserGetRequest", "/user/create": "UserCreateRequest" };
+        [Key in keyof Endpoints]?: keyof typeof SCHEMAS;
+    } = {"/routes":"RoutesRequest","/update/event":"UpdateEventRequest","/user/get":"UserGetRequest","/user/create":"UserCreateRequest"}
 
 export type Endpoints = {
-    "/routes": {
-        req: UserRoutes.RoutesRequest;
-        res: never;
-    };
-    "/update/event": {
-        req: Routes.UpdateEventRequest;
-        res: never;
-    };
-    "/user/list": {
-        req: never;
-        res: Routes.UserListResponse;
-    };
-    "/user/get": {
-        req: Routes.UserGetRequest;
-        res: Routes.UserGetResponse;
-    };
-    "/user/create": {
-        req: Routes.UserCreateRequest;
-        res: Routes.UserCreateResponse;
-    };
-};
+		"/routes": {
+            req: UserRoutes.RoutesRequest,
+            res: never,
+        },
+		"/update/event": {
+            req: Routes.UpdateEventRequest,
+            res: never,
+        },
+		"/user/list": {
+            req: never,
+            res: Routes.UserListResponse,
+        },
+		"/user/get": {
+            req: Routes.UserGetRequest,
+            res: Routes.UserGetResponse,
+        },
+		"/user/create": {
+            req: Routes.UserCreateRequest,
+            res: Routes.UserCreateResponse,
+        },
+}
+
+
 
 export class Client extends BaseClient<Endpoints> {
-    /**
-     * Fetches "/routes" from the server. (`Routes`)
-     */
-    public async routes(data: UserRoutes.RoutesRequest): Promise<void> {
-        await this.fetch("post", "/routes", data);
-    }
 
-    /**
-     * Validates `UserRoutes.RoutesRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-     */
-    public static validateRoutesRequest<Error extends string>(
-        data: UserRoutes.RoutesRequest,
-        settings: ValidationSettings = {}
-    ): ErrorType<UserRoutes.RoutesRequest, Error> | null {
-        return validate(SCHEMAS.RoutesRequest, data, settings);
-    }
+        /**
+         * Fetches "/routes" from the server. (`Routes`)
+         */
+        public async routes(data: UserRoutes.RoutesRequest): Promise<void> {
+            await this.fetch("post", "/routes", data);
+        }
 
-    /**
-     * Fetches "/update/event" from the server. (`UpdateEvent`)
-     */
-    public async updateEvent(data: Routes.UpdateEventRequest): Promise<void> {
-        await this.fetch("post", "/update/event", data);
-    }
 
-    /**
-     * Validates `Routes.UpdateEventRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-     */
-    public static validateUpdateEventRequest<Error extends string>(
-        data: Routes.UpdateEventRequest,
-        settings: ValidationSettings = {}
-    ): ErrorType<Routes.UpdateEventRequest, Error> | null {
-        return validate(SCHEMAS.UpdateEventRequest, data, settings);
-    }
+            /**
+             * Validates `UserRoutes.RoutesRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+             */
+            public static validateRoutesRequest<Error extends string>(data: UserRoutes.RoutesRequest, settings: ValidationSettings = { otherTypes: SCHEMAS }): ErrorType<UserRoutes.RoutesRequest, Error> | null {
+                return validate(SCHEMAS.RoutesRequest, data, settings);
+            }
 
-    /**
-     * Fetches "/user/list" from the server. (`UserList`)
-     */
-    public async userList(): Promise<Routes.UserListResponse> {
-        return await this.fetch("post", "/user/list");
-    }
 
-    /**
-     * Fetches "/user/get" from the server. (`UserGet`)
-     */
-    public async userGet(data: Routes.UserGetRequest): Promise<Routes.UserGetResponse> {
-        return await this.fetch("post", "/user/get", data);
-    }
+        /**
+         * Fetches "/update/event" from the server. (`UpdateEvent`)
+         */
+        public async updateEvent(data: Routes.UpdateEventRequest): Promise<void> {
+            await this.fetch("post", "/update/event", data);
+        }
 
-    /**
-     * Validates `Routes.UserGetRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-     */
-    public static validateUserGetRequest<Error extends string>(data: Routes.UserGetRequest, settings: ValidationSettings = {}): ErrorType<Routes.UserGetRequest, Error> | null {
-        return validate(SCHEMAS.UserGetRequest, data, settings);
-    }
 
-    /**
-     * Fetches "/user/create" from the server. (`UserCreate`)
-     */
-    public async userCreate(data: Routes.UserCreateRequest): Promise<Routes.UserCreateResponse> {
-        return await this.fetch("post", "/user/create", data);
-    }
+            /**
+             * Validates `Routes.UpdateEventRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+             */
+            public static validateUpdateEventRequest<Error extends string>(data: Routes.UpdateEventRequest, settings: ValidationSettings = { otherTypes: SCHEMAS }): ErrorType<Routes.UpdateEventRequest, Error> | null {
+                return validate(SCHEMAS.UpdateEventRequest, data, settings);
+            }
 
-    /**
-     * Validates `Routes.UserCreateRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-     */
-    public static validateUserCreateRequest<Error extends string>(
-        data: Routes.UserCreateRequest,
-        settings: ValidationSettings = {}
-    ): ErrorType<Routes.UserCreateRequest, Error> | null {
-        return validate(SCHEMAS.UserCreateRequest, data, settings);
-    }
+
+        /**
+         * Fetches "/user/list" from the server. (`UserList`)
+         */
+        public async userList(): Promise<Routes.UserListResponse> {
+            return await this.fetch("post", "/user/list");
+        }
+
+
+        /**
+         * Fetches "/user/get" from the server. (`UserGet`)
+         */
+        public async userGet(data: Routes.UserGetRequest): Promise<Routes.UserGetResponse> {
+            return await this.fetch("post", "/user/get", data);
+        }
+
+
+            /**
+             * Validates `Routes.UserGetRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+             */
+            public static validateUserGetRequest<Error extends string>(data: Routes.UserGetRequest, settings: ValidationSettings = { otherTypes: SCHEMAS }): ErrorType<Routes.UserGetRequest, Error> | null {
+                return validate(SCHEMAS.UserGetRequest, data, settings);
+            }
+
+
+        /**
+         * Fetches "/user/create" from the server. (`UserCreate`)
+         */
+        public async userCreate(data: Routes.UserCreateRequest): Promise<Routes.UserCreateResponse> {
+            return await this.fetch("post", "/user/create", data);
+        }
+
+
+            /**
+             * Validates `Routes.UserCreateRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+             */
+            public static validateUserCreateRequest<Error extends string>(data: Routes.UserCreateRequest, settings: ValidationSettings = { otherTypes: SCHEMAS }): ErrorType<Routes.UserCreateRequest, Error> | null {
+                return validate(SCHEMAS.UserCreateRequest, data, settings);
+            }
 }
 
 const SCHEMAS = {
-    RoutesRequest: {
-        type: "objectLiteral",
-        fields: {
-            name: {
-                type: "string",
-            },
-        },
+    "RoutesRequest": {
+        "type": "objectLiteral",
+        "fields": {
+            "name": {
+                "type": "string"
+            }
+        }
     },
-    UpdateEventRequest: {
-        type: "objectLiteral",
-        fields: {
-            event: {
-                type: "never",
+    "UpdateEventRequest": {
+        "type": "objectLiteral",
+        "fields": {
+            "event": {
+                "type": "never"
             },
-            notifyUsers: {
-                type: "or",
-                schemas: [
+            "notifyUsers": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "undefined",
+                        "type": "undefined"
                     },
                     {
-                        type: "booleanLiteral",
-                        value: false,
+                        "type": "booleanLiteral",
+                        "value": false
                     },
                     {
-                        type: "booleanLiteral",
-                        value: true,
-                    },
-                ],
-            },
-        },
+                        "type": "booleanLiteral",
+                        "value": true
+                    }
+                ]
+            }
+        }
     },
-    UserGetRequest: {
-        type: "objectLiteral",
-        fields: {
-            userId: {
-                type: "number",
-                min: 100,
-                minMessage: "Must be larger than 100",
-            },
-        },
+    "UserGetRequest": {
+        "type": "objectLiteral",
+        "fields": {
+            "userId": {
+                "type": "number",
+                "min": 100,
+                "minMessage": "Must be larger than 100"
+            }
+        }
     },
-    UserCreateRequest: {
-        type: "objectLiteral",
-        fields: {
-            email: {
-                type: "string",
-                regex: "^\\S+@\\S+\\.\\S+",
-                regexMessage: "Invalid email",
+    "UserCreateRequest": {
+        "type": "objectLiteral",
+        "fields": {
+            "email": {
+                "type": "string",
+                "regex": "^\\S+@\\S+\\.\\S+",
+                "regexMessage": "Invalid email"
             },
-            password: {
-                type: "string",
-                min: 1,
-                minMessage: "Password must be longer",
+            "password": {
+                "type": "string",
+                "min": 1,
+                "minMessage": "Password must be longer"
             },
-            birthDate: {
-                type: "date",
+            "birthDate": {
+                "type": "date"
             },
-            gender: {
-                type: "or",
-                schemas: [
+            "gender": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "stringLiteral",
-                        value: "male",
+                        "type": "stringLiteral",
+                        "value": "male"
                     },
                     {
-                        type: "stringLiteral",
-                        value: "female",
-                    },
-                ],
+                        "type": "stringLiteral",
+                        "value": "female"
+                    }
+                ]
             },
-            answers: {
-                type: "or",
-                schemas: [
+            "answers": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "undefined",
+                        "type": "undefined"
                     },
                     {
-                        type: "array",
-                        itemType: {
-                            type: "ref",
-                            name: "Answer<any>",
-                        },
-                    },
-                ],
-            },
-        },
+                        "type": "array",
+                        "itemType": {
+                            "type": "ref",
+                            "name": "Answer<any>"
+                        }
+                    }
+                ]
+            }
+        }
     },
     "Answer<any>": {
-        type: "objectLiteral",
-        fields: {
-            userId: {
-                type: "number",
+        "type": "objectLiteral",
+        "fields": {
+            "userId": {
+                "type": "number"
             },
-            user: {
-                type: "or",
-                schemas: [
+            "user": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "undefined",
+                        "type": "undefined"
                     },
                     {
-                        type: "ref",
-                        name: "User",
-                    },
-                ],
+                        "type": "ref",
+                        "name": "User"
+                    }
+                ]
             },
-            questionId: {
-                type: "number",
+            "questionId": {
+                "type": "number"
             },
-            question: {
-                type: "or",
-                schemas: [
+            "question": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "undefined",
+                        "type": "undefined"
                     },
                     {
-                        type: "ref",
-                        name: "Question<any>",
-                    },
-                ],
+                        "type": "ref",
+                        "name": "Question<any>"
+                    }
+                ]
             },
-            valueJson: {
-                type: "any",
+            "valueJson": {
+                "type": "any"
             },
-            createdTimeStamp: {
-                type: "number",
-            },
-        },
+            "createdTimeStamp": {
+                "type": "number"
+            }
+        }
     },
-    User: {
-        type: "objectLiteral",
-        fields: {
-            id: {
-                type: "number",
+    "User": {
+        "type": "objectLiteral",
+        "fields": {
+            "id": {
+                "type": "number"
             },
-            email: {
-                type: "string",
-                regex: "^\\S+@\\S+\\.\\S+",
-                regexMessage: "Invalid email",
+            "email": {
+                "type": "string",
+                "regex": "^\\S+@\\S+\\.\\S+",
+                "regexMessage": "Invalid email"
             },
-            password: {
-                type: "string",
-                min: 1,
-                minMessage: "Password must be longer",
+            "password": {
+                "type": "string",
+                "min": 1,
+                "minMessage": "Password must be longer"
             },
-            birthDate: {
-                type: "date",
+            "birthDate": {
+                "type": "date"
             },
-            gender: {
-                type: "or",
-                schemas: [
+            "gender": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "stringLiteral",
-                        value: "male",
+                        "type": "stringLiteral",
+                        "value": "male"
                     },
                     {
-                        type: "stringLiteral",
-                        value: "female",
-                    },
-                ],
+                        "type": "stringLiteral",
+                        "value": "female"
+                    }
+                ]
             },
-            answers: {
-                type: "or",
-                schemas: [
+            "answers": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "undefined",
+                        "type": "undefined"
                     },
                     {
-                        type: "array",
-                        itemType: {
-                            type: "ref",
-                            name: "Answer<any>",
-                        },
-                    },
-                ],
-            },
-        },
+                        "type": "array",
+                        "itemType": {
+                            "type": "ref",
+                            "name": "Answer<any>"
+                        }
+                    }
+                ]
+            }
+        }
     },
     "Question<any>": {
-        type: "objectLiteral",
-        fields: {
-            id: {
-                type: "or",
-                schemas: [
+        "type": "objectLiteral",
+        "fields": {
+            "id": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "undefined",
+                        "type": "undefined"
                     },
                     {
-                        type: "number",
-                    },
-                ],
+                        "type": "number"
+                    }
+                ]
             },
-            parameter: {
-                type: "or",
-                schemas: [
+            "parameter": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "null",
+                        "type": "null"
                     },
                     {
-                        type: "string",
-                    },
-                ],
+                        "type": "string"
+                    }
+                ]
             },
-            question: {
-                type: "string",
+            "question": {
+                "type": "string"
             },
-            type: {
-                type: "or",
-                schemas: [
+            "type": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "stringLiteral",
-                        value: "number",
+                        "type": "stringLiteral",
+                        "value": "number"
                     },
                     {
-                        type: "stringLiteral",
-                        value: "multiple",
+                        "type": "stringLiteral",
+                        "value": "multiple"
                     },
                     {
-                        type: "stringLiteral",
-                        value: "open",
+                        "type": "stringLiteral",
+                        "value": "open"
                     },
                     {
-                        type: "stringLiteral",
-                        value: "location",
+                        "type": "stringLiteral",
+                        "value": "location"
                     },
                     {
-                        type: "stringLiteral",
-                        value: "title",
+                        "type": "stringLiteral",
+                        "value": "title"
                     },
                     {
-                        type: "stringLiteral",
-                        value: "multipletable",
-                    },
-                ],
+                        "type": "stringLiteral",
+                        "value": "multipletable"
+                    }
+                ]
             },
-            optional: {
-                type: "boolean",
+            "optional": {
+                "type": "boolean"
             },
-            optionsJson: {
-                type: "any",
+            "optionsJson": {
+                "type": "any"
             },
-            order: {
-                type: "number",
+            "order": {
+                "type": "number"
             },
-            answers: {
-                type: "or",
-                schemas: [
+            "answers": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "undefined",
+                        "type": "undefined"
                     },
                     {
-                        type: "array",
-                        itemType: {
-                            type: "ref",
-                            name: "Answer<any>",
-                        },
-                    },
-                ],
+                        "type": "array",
+                        "itemType": {
+                            "type": "ref",
+                            "name": "Answer<any>"
+                        }
+                    }
+                ]
             },
-            conditions: {
-                type: "or",
-                schemas: [
+            "conditions": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "undefined",
+                        "type": "undefined"
                     },
                     {
-                        type: "array",
-                        itemType: {
-                            type: "ref",
-                            name: "Condition<any>",
-                        },
-                    },
-                ],
-            },
-        },
+                        "type": "array",
+                        "itemType": {
+                            "type": "ref",
+                            "name": "Condition<any>"
+                        }
+                    }
+                ]
+            }
+        }
     },
     "Condition<any>": {
-        type: "objectLiteral",
-        fields: {
-            id: {
-                type: "or",
-                schemas: [
+        "type": "objectLiteral",
+        "fields": {
+            "id": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "undefined",
+                        "type": "undefined"
                     },
                     {
-                        type: "number",
-                    },
-                ],
+                        "type": "number"
+                    }
+                ]
             },
-            operator: {
-                type: "or",
-                schemas: [
+            "operator": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "stringLiteral",
-                        value: "contains",
+                        "type": "stringLiteral",
+                        "value": "contains"
                     },
                     {
-                        type: "stringLiteral",
-                        value: "max",
+                        "type": "stringLiteral",
+                        "value": "max"
                     },
                     {
-                        type: "stringLiteral",
-                        value: "min",
-                    },
-                ],
+                        "type": "stringLiteral",
+                        "value": "min"
+                    }
+                ]
             },
-            valueJson: {
-                type: "any",
+            "valueJson": {
+                "type": "any"
             },
-            question: {
-                type: "or",
-                schemas: [
+            "question": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "undefined",
+                        "type": "undefined"
                     },
                     {
-                        type: "ref",
-                        name: "Question<any>",
-                    },
-                ],
-            },
-        },
-    },
+                        "type": "ref",
+                        "name": "Question<any>"
+                    }
+                ]
+            }
+        }
+    }
 } as const;
+    

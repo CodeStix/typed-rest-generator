@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@types/express-serve-static-core": "^4.17.18",
-    "qs": "^6.9.6"
+    "@types/qs": "^6.9.6"
   },
   "devDependencies": {
     "ts-node": "^9.1.1",

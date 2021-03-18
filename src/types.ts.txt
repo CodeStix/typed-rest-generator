@@ -17,7 +17,7 @@ export function withValidator(path: keyof Endpoints) {
     return (req: any, res: any, next: any) => {
         let val = PATH_VALIDATORS[path];
         if (!val) return next();
-        let err = validate(SCHEMAS[val], req.body, { abortEarly: true });
+        let err = validate(SCHEMAS[val], req.body, { abortEarly: true, otherTypes: SCHEMAS });
         if (err === null) {
             return next();
         } else {

@@ -36,6 +36,7 @@ The ultimate cli tool to generate typescript code that connects your client-side
     **Shared package**
 
     ```ts
+    // Make sure to install @types/qs and @types/express-serve-static-core as dependencies (not devDependencies!!)
     // index.ts
     export * from "./routes.ts";
     export * from "./generatedClient.ts"; // <-- make sure to export it first

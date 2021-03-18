@@ -1,6 +1,6 @@
 import express, { RequestHandler, IRouterMatcher } from "express";
 import { Post, PrismaClient } from "@prisma/client";
-import { Client, withValidator } from "shared";
+import { withValidator } from "shared";
 
 const app = express();
 const prisma = new PrismaClient();
