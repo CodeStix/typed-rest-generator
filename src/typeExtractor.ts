@@ -33,21 +33,20 @@ export type TypeSchema =
 export const SKIP_TYPES = ["Date", "Decimal", "Function"];
 
 export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeChecker, otherTypes: Types): TypeSchema {
-    let name = (type.aliasSymbol ?? type.symbol).name;
     let fullName = checker.typeToString(type);
-
-    if (fullName === "Date") {
-        return { type: "date" };
-    }
-
-    if (SKIP_TYPES.includes(fullName)) {
-        console.warn(`Not serializing type \`${fullName}\``);
+    let sym = type.aliasSymbol ?? type.symbol;
+    let isInline = sym.name === "__type";
+    if (!isInline && sym.declarations![0].getSourceFile().fileName.includes("node_modules/typescript/")) {
+        if (fullName === "Date") {
+            return { type: "date" };
+        }
+        console.warn(`Not including builtin type \`${fullName}\``);
         return { type: "never" };
     }
 
     let schema: TypeSchema = { type: "objectLiteral", fields: {} };
-    if (name !== "__type") {
-        if (name in otherTypes) return { type: "ref", name: fullName };
+    if (!isInline) {
+        if (fullName in otherTypes) return { type: "ref", name: fullName };
         otherTypes[fullName] = schema;
     }
 
@@ -69,7 +68,7 @@ export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeC
         schema.fields[property.name] = sch;
     }
 
-    return name !== "__type" ? { type: "ref", name: fullName } : schema;
+    return !isInline ? { type: "ref", name: fullName } : schema;
 }
 
 export function createSchemaForType(type: ts.Type, checker: ts.TypeChecker, otherTypes: Types, customProps: JSDocProps = {}): TypeSchema {
