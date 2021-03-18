@@ -366,8 +366,9 @@ const SCHEMAS = {
     "UpdateEventRequest": {
         "type": "objectLiteral",
         "fields": {
-            "event": {
-                "type": "never"
+            "test": {
+                "type": "ref",
+                "name": "Omit<Test, \"events\">"
             },
             "notifyUsers": {
                 "type": "or",
@@ -384,6 +385,49 @@ const SCHEMAS = {
                         "value": true
                     }
                 ]
+            }
+        }
+    },
+    "Omit<Test, \"events\">": {
+        "type": "objectLiteral",
+        "fields": {
+            "id": {
+                "type": "or",
+                "schemas": [
+                    {
+                        "type": "undefined"
+                    },
+                    {
+                        "type": "number"
+                    }
+                ]
+            },
+            "name": {
+                "type": "string"
+            },
+            "duration": {
+                "type": "number"
+            },
+            "reward": {
+                "type": "number"
+            },
+            "description": {
+                "type": "string"
+            },
+            "minAge": {
+                "type": "number"
+            },
+            "maxAge": {
+                "type": "number"
+            },
+            "language": {
+                "type": "string"
+            },
+            "createdTimeStamp": {
+                "type": "number"
+            },
+            "notifiedUsers": {
+                "type": "boolean"
             }
         }
     },
@@ -423,257 +467,6 @@ const SCHEMAS = {
                     {
                         "type": "stringLiteral",
                         "value": "female"
-                    }
-                ]
-            },
-            "answers": {
-                "type": "or",
-                "schemas": [
-                    {
-                        "type": "undefined"
-                    },
-                    {
-                        "type": "array",
-                        "itemType": {
-                            "type": "ref",
-                            "name": "Answer<any>"
-                        }
-                    }
-                ]
-            }
-        }
-    },
-    "Answer<any>": {
-        "type": "objectLiteral",
-        "fields": {
-            "userId": {
-                "type": "number"
-            },
-            "user": {
-                "type": "or",
-                "schemas": [
-                    {
-                        "type": "undefined"
-                    },
-                    {
-                        "type": "ref",
-                        "name": "User"
-                    }
-                ]
-            },
-            "questionId": {
-                "type": "number"
-            },
-            "question": {
-                "type": "or",
-                "schemas": [
-                    {
-                        "type": "undefined"
-                    },
-                    {
-                        "type": "ref",
-                        "name": "Question<any>"
-                    }
-                ]
-            },
-            "valueJson": {
-                "type": "any"
-            },
-            "createdTimeStamp": {
-                "type": "number"
-            }
-        }
-    },
-    "User": {
-        "type": "objectLiteral",
-        "fields": {
-            "id": {
-                "type": "number"
-            },
-            "email": {
-                "type": "string",
-                "regex": "^\\S+@\\S+\\.\\S+",
-                "regexMessage": "Invalid email"
-            },
-            "password": {
-                "type": "string",
-                "min": 1,
-                "minMessage": "Password must be longer"
-            },
-            "birthDate": {
-                "type": "date"
-            },
-            "gender": {
-                "type": "or",
-                "schemas": [
-                    {
-                        "type": "stringLiteral",
-                        "value": "male"
-                    },
-                    {
-                        "type": "stringLiteral",
-                        "value": "female"
-                    }
-                ]
-            },
-            "answers": {
-                "type": "or",
-                "schemas": [
-                    {
-                        "type": "undefined"
-                    },
-                    {
-                        "type": "array",
-                        "itemType": {
-                            "type": "ref",
-                            "name": "Answer<any>"
-                        }
-                    }
-                ]
-            }
-        }
-    },
-    "Question<any>": {
-        "type": "objectLiteral",
-        "fields": {
-            "id": {
-                "type": "or",
-                "schemas": [
-                    {
-                        "type": "undefined"
-                    },
-                    {
-                        "type": "number"
-                    }
-                ]
-            },
-            "parameter": {
-                "type": "or",
-                "schemas": [
-                    {
-                        "type": "null"
-                    },
-                    {
-                        "type": "string"
-                    }
-                ]
-            },
-            "question": {
-                "type": "string"
-            },
-            "type": {
-                "type": "or",
-                "schemas": [
-                    {
-                        "type": "stringLiteral",
-                        "value": "number"
-                    },
-                    {
-                        "type": "stringLiteral",
-                        "value": "multiple"
-                    },
-                    {
-                        "type": "stringLiteral",
-                        "value": "open"
-                    },
-                    {
-                        "type": "stringLiteral",
-                        "value": "location"
-                    },
-                    {
-                        "type": "stringLiteral",
-                        "value": "title"
-                    },
-                    {
-                        "type": "stringLiteral",
-                        "value": "multipletable"
-                    }
-                ]
-            },
-            "optional": {
-                "type": "boolean"
-            },
-            "optionsJson": {
-                "type": "any"
-            },
-            "order": {
-                "type": "number"
-            },
-            "answers": {
-                "type": "or",
-                "schemas": [
-                    {
-                        "type": "undefined"
-                    },
-                    {
-                        "type": "array",
-                        "itemType": {
-                            "type": "ref",
-                            "name": "Answer<any>"
-                        }
-                    }
-                ]
-            },
-            "conditions": {
-                "type": "or",
-                "schemas": [
-                    {
-                        "type": "undefined"
-                    },
-                    {
-                        "type": "array",
-                        "itemType": {
-                            "type": "ref",
-                            "name": "Condition<any>"
-                        }
-                    }
-                ]
-            }
-        }
-    },
-    "Condition<any>": {
-        "type": "objectLiteral",
-        "fields": {
-            "id": {
-                "type": "or",
-                "schemas": [
-                    {
-                        "type": "undefined"
-                    },
-                    {
-                        "type": "number"
-                    }
-                ]
-            },
-            "operator": {
-                "type": "or",
-                "schemas": [
-                    {
-                        "type": "stringLiteral",
-                        "value": "contains"
-                    },
-                    {
-                        "type": "stringLiteral",
-                        "value": "max"
-                    },
-                    {
-                        "type": "stringLiteral",
-                        "value": "min"
-                    }
-                ]
-            },
-            "valueJson": {
-                "type": "any"
-            },
-            "question": {
-                "type": "or",
-                "schemas": [
-                    {
-                        "type": "undefined"
-                    },
-                    {
-                        "type": "ref",
-                        "name": "Question<any>"
                     }
                 ]
             }

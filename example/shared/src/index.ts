@@ -7,6 +7,31 @@ export const Gender: {
 
 export type Gender = typeof Gender[keyof typeof Gender];
 
+export class Test {
+    id?: number;
+    name: string;
+    duration: number;
+    reward: number;
+    description: string;
+    minAge: number;
+    maxAge: number;
+    language: string;
+    createdTimeStamp: number;
+    notifiedUsers: boolean;
+
+    constructor(name: string) {
+        this.name = name;
+        this.duration = 30;
+        this.reward = 15;
+        this.description = "";
+        this.minAge = 12;
+        this.maxAge = 75;
+        this.language = "asdf";
+        this.createdTimeStamp = new Date().getTime();
+        this.notifiedUsers = false;
+    }
+}
+
 export type User = {
     id: number;
     /**
@@ -19,7 +44,6 @@ export type User = {
     password: string;
     birthDate: Date;
     gender: Gender;
-    answers?: Answer[];
 };
 
 export type Post = {
@@ -31,81 +55,9 @@ export type Post = {
 
 export type QuestionType = "multiple" | "open" | "number" | "location" | "title" | "multipletable";
 
-export type Comparison = "contains" | "max" | "min";
-
-export class Condition<TValue extends any = any> {
-    id?: number;
-    operator: Comparison;
-    valueJson: TValue;
-
-    question?: Question;
-
-    constructor(operator: Comparison) {
-        this.operator = operator;
-        this.valueJson = {} as TValue;
-    }
-
-    static compare(a: string, b: string) {
-        if (!(typeof a === "string") || !(typeof b === "string")) {
-            console.warn("comparing non-string", a, b);
-            return false;
-        }
-        return (
-            a.trim().localeCompare(b.trim(), ["nl", "fr", "en"], {
-                ignorePunctuation: true,
-                sensitivity: "base",
-            }) === 0
-        );
-    }
-}
-
-export interface Answer<TAnswer extends any = any> {
-    userId: number;
-    user?: User;
-    questionId: number;
-    question?: Question;
-    valueJson: TAnswer;
-    createdTimeStamp: number;
-}
-
-export class Question<TOptions extends any = any> {
-    id?: number;
-    parameter: string | null; // parameter is null when it is not tracked (for title)
-    question: string;
-    type: QuestionType;
-    optional: boolean;
-    optionsJson: TOptions | null;
-    order: number;
-
-    answers?: Answer[];
-    conditions?: Condition[];
-
-    constructor(
-        conditions?: Condition[],
-        optional: boolean = false,
-        parameter: string | null = "",
-        question: string = "",
-        type: QuestionType = "open",
-        optionsJson: TOptions | null = null,
-        order: number = 0
-    ) {
-        this.optional = optional;
-        this.parameter = parameter;
-        this.question = question;
-        this.type = type;
-        this.conditions = conditions;
-        this.optionsJson = optionsJson;
-        this.order = order;
-    }
-
-    static clone(other: Question) {
-        return new Question(other.conditions, other.optional, other.parameter, other.question, other.type, other.optionsJson, other.order);
-    }
-}
-
 export namespace Routes {
     export interface UpdateEventRequest {
-        event: Event;
+        test: Omit<Test, "events">;
         notifyUsers?: boolean;
     }
 

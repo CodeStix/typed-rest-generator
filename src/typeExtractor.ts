@@ -41,8 +41,7 @@ export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeC
         if (fullName === "Date") {
             return { type: "date" };
         }
-        console.warn(`Not including builtin type \`${fullName}\``);
-        return { type: "never" };
+        console.warn(`Including builtin type \`${fullName}\``);
     }
 
     let schema: TypeSchema = { type: "objectLiteral", fields: {} };
