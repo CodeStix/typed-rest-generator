@@ -195,6 +195,8 @@ export function validate<T, Error extends string = string>(schema: TypeSchema, v
     }
 }
 
+/* ---- Client-side ---- */
+
 export class ValidationError extends Error {
     constructor(message: string, public errors: ErrorMap<any>) {
         super(message);
@@ -210,8 +212,6 @@ export class RateLimitError extends Error {
         Error.captureStackTrace(this, this.constructor);
     }
 }
-
-/* ---- Client-side ---- */
 
 export async function defaultFetcher(url: any, method: any, body: any) {
     let res = await fetch(url, {
@@ -257,7 +257,7 @@ import { Routes } from "./index"
 
 const PATH_VALIDATORS: {
         [Key in keyof Endpoints]?: keyof typeof SCHEMAS;
-    } = {"/routes":"RoutesRequest","/user/get":"UserGetRequest","/user/create":"UserCreateRequest","/post/create":"PostCreateRequest","/user/post/list":"UserPostListRequest"}
+    } = {"/routes":"RoutesRequest","/user/get":"UserGetRequest","/user/create":"UserCreateRequest"}
 
 export type Endpoints = {
 		"/routes": {
@@ -275,14 +275,6 @@ export type Endpoints = {
 		"/user/create": {
             req: Routes.UserCreateRequest,
             res: Routes.UserCreateResponse,
-        },
-		"/post/create": {
-            req: Routes.PostCreateRequest,
-            res: Routes.PostCreateResponse,
-        },
-		"/user/post/list": {
-            req: Routes.UserPostListRequest,
-            res: Routes.UserPostListResponse,
         },
 }
 
@@ -344,38 +336,6 @@ export class Client extends BaseClient<Endpoints> {
             public static validateUserCreateRequest<Error extends string>(data: Routes.UserCreateRequest, settings: ValidationSettings = {}): ErrorType<Routes.UserCreateRequest, Error> | null {
                 return validate(SCHEMAS.UserCreateRequest, data, settings);
             }
-
-
-        /**
-         * Fetches "/post/create" from the server. (`PostCreate`)
-         */
-        public async postCreate(data: Routes.PostCreateRequest): Promise<Routes.PostCreateResponse> {
-            return await this.fetch("post", "/post/create", data);
-        }
-
-
-            /**
-             * Validates `Routes.PostCreateRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-             */
-            public static validatePostCreateRequest<Error extends string>(data: Routes.PostCreateRequest, settings: ValidationSettings = {}): ErrorType<Routes.PostCreateRequest, Error> | null {
-                return validate(SCHEMAS.PostCreateRequest, data, settings);
-            }
-
-
-        /**
-         * Fetches "/user/post/list" from the server. (`UserPostList`)
-         */
-        public async userPostList(data: Routes.UserPostListRequest): Promise<Routes.UserPostListResponse> {
-            return await this.fetch("post", "/user/post/list", data);
-        }
-
-
-            /**
-             * Validates `Routes.UserPostListRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-             */
-            public static validateUserPostListRequest<Error extends string>(data: Routes.UserPostListRequest, settings: ValidationSettings = {}): ErrorType<Routes.UserPostListRequest, Error> | null {
-                return validate(SCHEMAS.UserPostListRequest, data, settings);
-            }
 }
 
 const SCHEMAS = {
@@ -421,25 +381,6 @@ const SCHEMAS = {
                         "value": "female"
                     }
                 ]
-            }
-        }
-    },
-    "PostCreateRequest": {
-        "type": "objectLiteral",
-        "fields": {
-            "title": {
-                "type": "string"
-            },
-            "content": {
-                "type": "string"
-            }
-        }
-    },
-    "UserPostListRequest": {
-        "type": "objectLiteral",
-        "fields": {
-            "userId": {
-                "type": "number"
             }
         }
     }

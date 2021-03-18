@@ -12,7 +12,6 @@ function App() {
         false
     );
     const [users, setUsers] = useState<User[] | null>(null);
-    const [posts, setPosts] = useState<Post[]>([]);
 
     useEffect(() => {
         (async () => {
@@ -34,8 +33,8 @@ function App() {
                               <button
                                   onClick={async () => {
                                       // async () => alert(JSON.stringify(await client.userGet({ userId: e.id })))
-                                      let posts = await client.userPostList({ userId: e.id });
-                                      setPosts(posts.posts);
+                                      let user = await client.userGet({ userId: e.id });
+                                      alert(JSON.stringify(user, null, 2));
                                   }}
                               >
                                   More info
@@ -73,25 +72,6 @@ function App() {
                 </FormSelect>
                 <button>Create</button>
             </form>
-
-            <h3>Posts</h3>
-            {posts.length === 0
-                ? "No posts!"
-                : posts.map((post) => (
-                      <div key={post.id} style={{ background: "#0001", padding: "1em" }}>
-                          <h4>{post.title}</h4>
-                          <pre>{post.content}</pre>
-                      </div>
-                  ))}
-
-            <button
-                onClick={async () => {
-                    let newPost = await client.postCreate({ content: "Proident qui sint laborum duis eu do officia anim irure pariatur.", title: prompt("Enter title") as any });
-                    setPosts([...posts, newPost.post]);
-                }}
-            >
-                Create post!
-            </button>
         </div>
     );
 }

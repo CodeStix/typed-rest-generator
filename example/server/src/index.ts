@@ -21,6 +21,10 @@ app.post("/user/list", withValidator("/user/list"), async (req, res, next) => {
 });
 
 app.post("/user/create", withValidator("/user/create"), async (req, res, next) => {
+    if ((await prisma.user.count({ where: { email: req.body.email } })) !== 0) {
+        return res.json({ status: "error", error: { email: "User with this email already exists" } });
+    }
+
     let user = await prisma.user.create({
         data: req.body,
     });
