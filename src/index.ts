@@ -22,7 +22,8 @@ function main() {
     if (options.watch) {
         console.log("Watching for changes...");
         execute(inputFile, outputFile);
-        chokidar.watch(inputFile, {}).on("change", (ev, file) => {
+        let watchFiles = getProgramPaths(inputFile).filter((e) => e !== outputFile);
+        chokidar.watch(watchFiles, {}).on("change", () => {
             try {
                 execute(inputFile, outputFile);
             } catch (ex) {
@@ -34,14 +35,24 @@ function main() {
     }
 }
 
-function execute(inputFile: string, outputFile: string) {
-    console.log(`${inputFile} -> ${outputFile}`);
+function getProgramPaths(inputFile: string) {
+    let compilerOptions = getCompilerOptions();
+    let typescriptProgram = ts.createProgram([inputFile], compilerOptions);
+    return typescriptProgram.getSourceFiles().map((e) => path.relative(process.cwd(), e.fileName));
+}
+
+function getCompilerOptions() {
     let configFileName = ts.findConfigFile(process.cwd(), ts.sys.fileExists, "tsconfig.json");
     if (!configFileName) {
         throw new Error("tsconfig.json could not be found");
     }
     let compilerOptionsFile = ts.readConfigFile(configFileName, ts.sys.readFile);
-    let compilerOptions = ts.parseJsonConfigFileContent(compilerOptionsFile.config, ts.sys, "./").options;
+    return ts.parseJsonConfigFileContent(compilerOptionsFile.config, ts.sys, "./").options;
+}
+
+function execute(inputFile: string, outputFile: string) {
+    console.log(`${inputFile} -> ${outputFile}`);
+    let compilerOptions = getCompilerOptions();
     let typescriptProgram = ts.createProgram([inputFile], compilerOptions);
     let methodTypes: PathTypes = {};
 
