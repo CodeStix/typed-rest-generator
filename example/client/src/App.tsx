@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Client, ErrorMap, Post, Routes, User, UserWithoutId } from "shared";
+import { Client, ErrorMap, Post, Routes, User } from "shared";
 import { FormError, FormInput, FormSelect, useForm } from "typed-react-form";
 
 let client = new Client({ path: "http://localhost:3002/" });

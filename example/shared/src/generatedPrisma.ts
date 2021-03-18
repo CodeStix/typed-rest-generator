@@ -8,11 +8,11 @@ export type Gender = typeof Gender[keyof typeof Gender];
 export type User = {
     id: number;
     /**
-     * @v-regex /^\S+@\S+\.\S+$/
+     * @v-regex /^\S+@\S+\.\S+$/ Invalid email
      */
     email: string;
     /**
-     * @v-min 1
+     * @v-min 1 Password must be longer
      */
     password: string;
     birthDate: Date;
