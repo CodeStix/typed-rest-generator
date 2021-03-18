@@ -1,7 +1,67 @@
-/* DO NOT MODIFY, THIS FILE WAS GENERATED */
+/* !!!! DO NOT MODIFY, THIS FILE WAS GENERATED !!!! */
+/* Generated using typed-rest-generator */
+
+type EndpointsConstraint = {
+    [path: string]: {
+        req: any;
+        res: any;
+    };
+};
+
+/* ---- Server-side (express) ---- */
 
 import type c from "express-serve-static-core";
 import type p from "qs";
+
+export function withValidator(path: keyof Endpoints) {
+    return (req: any, res: any, next: any) => {
+        let val = PATH_VALIDATORS[path];
+        if (!val) return next();
+        let err = validate(SCHEMAS[val], req.body, { abortEarly: true });
+        if (err === null) {
+            return next();
+        } else {
+            return res.status(406).json(err);
+        }
+    };
+}
+
+declare module "express-serve-static-core" {
+    export interface IRouterMatcher<T, Method extends "all" | "get" | "post" | "put" | "delete" | "patch" | "options" | "head" = any> {
+        <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
+            path: Path,
+            // tslint:disable-next-line no-unnecessary-generics (This generic is meant to be passed explicitly.)
+            ...handlers: Array<c.RequestHandler<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
+        ): T;
+        <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
+            path: Path,
+            // tslint:disable-next-line no-unnecessary-generics (This generic is meant to be passed explicitly.)
+            ...handlers: Array<c.RequestHandlerParams<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
+        ): T;
+    }
+}
+
+// interface ITypedRouter {
+//     typed: ITypedRouterPostMatcher<this>;
+// }
+// interface ITypedRouterPostMatcher<T> {
+//     <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
+//         path: Path,
+//         ...handlers: Array<c.RequestHandler<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
+//     ): T;
+//     <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
+//         path: Path,
+//         ...handlers: Array<c.RequestHandlerParams<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
+//     ): T;
+// }
+// export function typedRouter<T extends c.IRouter>(router: T): T & ITypedRouter {
+//     (router as any).typed = (path: keyof Endpoints, ...rest: any[]) => {
+//         router.post(path, withValidator(path), ...rest);
+//     };
+//     return router as any;
+// }
+
+/* ---- Validation ---- */
 
 export type Types = {
     [name: string]: TypeSchema;
@@ -26,64 +86,6 @@ export type TypeSchema =
     | { type: "numberLiteral"; value: number }
     | { type: "stringLiteral"; value: string }
     | { type: "booleanLiteral"; value: boolean };
-
-type EndpointsConstraint = {
-    [path: string]: {
-        req: any;
-        res: any;
-    };
-};
-
-interface ITypedRouter {
-    typed: ITypedRouterPostMatcher<this>;
-}
-
-interface ITypedRouterPostMatcher<T> {
-    <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
-        path: Path,
-        ...handlers: Array<c.RequestHandler<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
-    ): T;
-    <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
-        path: Path,
-        ...handlers: Array<c.RequestHandlerParams<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
-    ): T;
-}
-
-export function typedRouter<T extends c.IRouter>(router: T): T & ITypedRouter {
-    (router as any).typed = (path: keyof Endpoints, ...rest: any[]) => {
-        router.post(
-            path,
-            (req, res, next) => {
-                let val = PATH_VALIDATORS[path];
-                if (!val) return next();
-                let err = validate(SCHEMAS[val], req.body, { abortEarly: true });
-                if (err === null) {
-                    return next();
-                } else {
-                    // next(new Error("Invalid body"))
-                    return res.status(400).json(err);
-                }
-            },
-            ...rest
-        );
-    };
-    return router as any;
-}
-
-// declare module "express-serve-static-core" {
-//     export interface IRouterMatcher<T, Method extends "all" | "get" | "post" | "put" | "delete" | "patch" | "options" | "head" = any> {
-//         <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
-//             path: Path,
-//             // tslint:disable-next-line no-unnecessary-generics (This generic is meant to be passed explicitly.)
-//             ...handlers: Array<c.RequestHandler<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
-//         ): T;
-//         <Path extends keyof U, P = c.ParamsDictionary, ReqQuery = p.ParsedQs, Locals extends Record<string, any> = Record<string, any>, U extends EndpointsConstraint = Endpoints>(
-//             path: Path,
-//             // tslint:disable-next-line no-unnecessary-generics (This generic is meant to be passed explicitly.)
-//             ...handlers: Array<c.RequestHandlerParams<P, U[Path]["res"], U[Path]["req"], ReqQuery, Locals>>
-//         ): T;
-//     }
-// }
 
 export type ErrorType<T, Error = string> = Error | (T extends {} ? ErrorMap<T, Error> : never);
 export type ErrorMap<T, Error = string> = {
@@ -193,6 +195,23 @@ export function validate<T, Error extends string = string>(schema: TypeSchema, v
     }
 }
 
+/* ---- Client-side ---- */
+
+export class ValidationError extends Error {
+    constructor(message: string, public errors: ErrorMap<any>) {
+        super(message);
+        this.name = this.constructor.name;
+        Error.captureStackTrace(this, this.constructor);
+    }
+}
+
+export class RateLimitError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = this.constructor.name;
+        Error.captureStackTrace(this, this.constructor);
+    }
+}
 
 export async function defaultFetcher(url: any, method: any, body: any) {
     let res = await fetch(url, {
@@ -200,12 +219,15 @@ export async function defaultFetcher(url: any, method: any, body: any) {
         body: typeof body === "object" ? JSON.stringify(body) : null,
         headers: { "Content-Type": "application/json" },
     });
-    if (res.status === 200) {
+
+    if (res.status <= 400) {
         return await res.json();
+    } else if (res.status === 406) {
+        throw new ValidationError("Validation error", await res.json());
+    } else if (res.status === 429) {
+        throw new RateLimitError("Rate limited");
     } else if (res.status === 401) {
         throw new Error(`Unauthorized. To implement authorization, override fetcher in the client settings.`);
-    } else if (res.status === 404 || (res.status > 200 && res.status < 300)) {
-        return null;
     } else {
         throw new Error(`Could not fetch '${method}' (HTTP ${res.status}: ${res.statusText})`);
     }

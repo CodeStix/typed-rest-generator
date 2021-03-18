@@ -1,8 +1,8 @@
 import express, { RequestHandler, IRouterMatcher } from "express";
 import { Post, PrismaClient } from "@prisma/client";
-import { Client, typedRouter } from "shared";
+import { Client, withValidator } from "shared";
 
-const app = typedRouter(express());
+const app = express();
 const prisma = new PrismaClient();
 
 app.use(express.json());
@@ -13,14 +13,14 @@ app.use((req, res, next) => {
     next();
 });
 
-app.typed("/user/list", async (req, res, next) => {
+app.post("/user/list", withValidator("/user/list"), async (req, res, next) => {
     let users = await prisma.user.findMany();
     res.json({
         users,
     });
 });
 
-app.typed("/user/create", async (req, res, next) => {
+app.post("/user/create", withValidator("/user/create"), async (req, res, next) => {
     let user = await prisma.user.create({
         data: req.body,
     });
@@ -28,7 +28,7 @@ app.typed("/user/create", async (req, res, next) => {
     res.json({ status: "ok", user: user });
 });
 
-app.typed("/user/get", async (req, res, next) => {
+app.post("/user/get", withValidator("/user/get"), async (req, res, next) => {
     let user = await prisma.user.findUnique({ where: { id: req.body.userId } });
     if (!user) {
         return res.status(404).end();
