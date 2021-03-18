@@ -251,7 +251,9 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
         });
 
         if (res.status <= 400) {
-            return await res.json();
+            let text = (await res.text()).trim();
+            if (!text) return undefined as any;
+            return JSON.parse(text);
         } else if (res.status === 406) {
             throw new ValidationError("Validation error", await res.json());
         } else if (res.status === 429) {
