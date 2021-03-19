@@ -77,7 +77,7 @@ export function followImport(node: ts.ImportSpecifier, typeChecker: ts.TypeCheck
     return type.aliasSymbol ?? type.symbol;
 }
 
-export function generateCode(typeChecker: ts.TypeChecker, paths: PathTypes, outputStream: fs.WriteStream, outputDirectory: string, version: string, obfuscaseNames: boolean) {
+export function generateCode(typeChecker: ts.TypeChecker, paths: PathTypes, outputStream: fs.WriteStream, outputDirectory: string, version: string, obfuscateRootTypes: boolean) {
     // Write default types
     outputStream.write(getDefaultTypes());
 
@@ -129,7 +129,7 @@ export function generateCode(typeChecker: ts.TypeChecker, paths: PathTypes, outp
                 {
                     checker: typeChecker,
                     otherTypes: typeSchemas,
-                    obfuscateRootTypes: true,
+                    obfuscateRootTypes: obfuscateRootTypes,
                 }
             );
             pathTypes[path] = ref.name;

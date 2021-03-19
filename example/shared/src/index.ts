@@ -66,23 +66,11 @@ export namespace Routes {
     export interface UserListResponse {
         users: User[];
     }
-
-    export type TestRequest = {
-        yikes: {
-            asdf: boolean;
-        };
-    };
-
     export interface UserGetRequest {
         /**
          * @v-min 0 Must be larger than 0
          */
         userId: number;
-        data: {
-            yes: boolean;
-            date: Date;
-            val: Yiesk<number>;
-        };
     }
 
     export interface UserGetResponse {

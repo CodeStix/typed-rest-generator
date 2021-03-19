@@ -16,26 +16,28 @@ function main() {
     program.option("-o --output <file>", "The destination file to generate. Will be overwritten.", "");
     program.option("-w --watch", "Watch the input file for changes.");
     program.option("-n --namespace", "Look for route types in `Routes` namespaces.");
+    program.option("--no-obfuscate", "Do not obfuscate type names.");
     program.parse(process.argv);
     let options = program.opts();
     let inputFile = options.input;
     let outputFile = options.output;
     let namespaceOnly = options.namespace;
+    let obfuscateRootTypes = options.obfuscate;
     if (!outputFile) outputFile = path.join(path.dirname(inputFile), "generatedClient.ts");
 
     if (options.watch) {
         console.log("Watching for changes...");
-        execute(inputFile, outputFile, namespaceOnly, VERSION);
+        execute(inputFile, outputFile, namespaceOnly, VERSION, obfuscateRootTypes);
         let watchFiles = getProgramPaths(inputFile).filter((e) => e !== outputFile);
         chokidar.watch(watchFiles, {}).on("change", () => {
             try {
-                execute(inputFile, outputFile, namespaceOnly, VERSION);
+                execute(inputFile, outputFile, namespaceOnly, VERSION, obfuscateRootTypes);
             } catch (ex) {
                 console.error(ex);
             }
         });
     } else {
-        execute(inputFile, outputFile, namespaceOnly, VERSION);
+        execute(inputFile, outputFile, namespaceOnly, VERSION, obfuscateRootTypes);
     }
 }
 
@@ -54,7 +56,7 @@ function getCompilerOptions() {
     return ts.parseJsonConfigFileContent(compilerOptionsFile.config, ts.sys, "./").options;
 }
 
-function execute(inputFile: string, outputFile: string, onlyNamespace: boolean, version: string) {
+function execute(inputFile: string, outputFile: string, onlyNamespace: boolean, version: string, obfuscateRootTypes: boolean) {
     console.log(`${inputFile} -> ${outputFile}`);
     let compilerOptions = getCompilerOptions();
     let typescriptProgram = ts.createProgram([inputFile], compilerOptions);
@@ -71,7 +73,7 @@ function execute(inputFile: string, outputFile: string, onlyNamespace: boolean, 
     });
 
     let output = fs.createWriteStream(outputFile);
-    generateCode(checker, pathTypes, output, path.dirname(outputFile), version, true);
+    generateCode(checker, pathTypes, output, path.dirname(outputFile), version, obfuscateRootTypes);
     output.close();
 }
 

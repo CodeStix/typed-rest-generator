@@ -1,6 +1,5 @@
-import ts, { breakIntoCharacterSpans } from "byots";
+import ts from "byots";
 import { symbolHasFlag, symbolFlagsToString, typeFlagsToString, getSymbolUsageName, getFullTypeName, isDefaultType } from "./helpers";
-import crypto from "crypto";
 
 export type JSDocProps = {
     [prop: string]: string;
@@ -44,9 +43,24 @@ export interface TypeSchemaGeneratorSettings {
     obfuscateRootTypes?: boolean;
 }
 
+let obfuscationMap: {
+    [name: string]: string;
+} = {};
+let obfuscationIndex = 0;
+
+function obfuscate(name: string) {
+    if (name in obfuscationMap) {
+        return obfuscationMap[name];
+    } else {
+        let n = obfuscationIndex++ + "";
+        obfuscationMap[n] = name;
+        return n;
+    }
+}
+
 function createSchemaForObjectType(type: ts.ObjectType, settings: TypeSchemaGeneratorSettings): TypeSchema {
     let fullName = getFullTypeName(type, settings.checker);
-    let serializeName = settings.obfuscateRootTypes ? crypto.createHash("sha1").update(fullName).digest("hex") : fullName;
+    let serializeName = settings.obfuscateRootTypes ? obfuscate(fullName) : fullName;
     let sym = type.aliasSymbol ?? type.symbol;
     let isInline = sym.name === "__type";
 

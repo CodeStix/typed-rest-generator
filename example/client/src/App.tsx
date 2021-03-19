@@ -7,7 +7,7 @@ let client = new Client({ path: "http://localhost:3002/" });
 function App() {
     const form = useForm<Routes.UserCreateRequest>(
         { password: "", birthDate: new Date(), email: "", gender: "male" },
-        (data) => (Client.validateUserCreateRequest(data) as ErrorMap<Routes.UserCreateRequest>) ?? {},
+        (data) => (Client.validateRoutesUserCreateRequest(data) as ErrorMap<Routes.UserCreateRequest>) ?? {},
         true,
         false
     );
