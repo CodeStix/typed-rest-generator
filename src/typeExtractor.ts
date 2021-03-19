@@ -53,7 +53,7 @@ function obfuscate(name: string) {
         return obfuscationMap[name];
     } else {
         let n = obfuscationIndex++ + "";
-        obfuscationMap[n] = name;
+        obfuscationMap[name] = n;
         return n;
     }
 }
