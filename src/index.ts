@@ -7,7 +7,7 @@ import { generateCode, getRouteTypes, getRouteTypesFromRoutesNamespace, PathType
 import { Command } from "commander";
 import chokidar from "chokidar";
 
-const VERSION = "1.1.2";
+const VERSION = "1.1.3";
 
 function main() {
     let program = new Command("typed-rest-generator");
