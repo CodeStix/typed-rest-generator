@@ -273,11 +273,11 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
     }
 }
 import { UserRoutes } from "./userRoutes"
-import { Routes, Test } from "./index"
+import { Routes, Test, Question, MultipleAnswerValue, OpenAnswerValue, NumberAnswerValue, LocationAnswerValue, MultipleTableAnswerValue } from "./index"
 
 const PATH_VALIDATORS: {
         [Key in keyof Endpoints]?: keyof typeof SCHEMAS;
-    } = {"/routes":"0","/update/event":"1","/user/get":"3","/user/create":"4"}
+    } = {"/routes":"0","/update/event":"1","/question/answer":"3","/user/get":"10","/user/create":"11"}
 
 export type Endpoints = {
 		"/routes": {
@@ -286,6 +286,10 @@ export type Endpoints = {
         },
 		"/update/event": {
             req: Routes.UpdateEventRequest,
+            res: never,
+        },
+		"/question/answer": {
+            req: Routes.QuestionAnswerRequest,
             res: never,
         },
 		"/user/list": {
@@ -304,7 +308,7 @@ export type Endpoints = {
 
 
 
-const VERSION = "1.1.2";
+const VERSION = "1.1.4";
 
 export class Client extends BaseClient<Endpoints> {
     
@@ -322,6 +326,14 @@ export class Client extends BaseClient<Endpoints> {
          */
         public async updateEvent(data: Routes.UpdateEventRequest): Promise<void> {
             await this.fetch("post", "/update/event", data);
+        }
+
+
+        /**
+         * Fetches "/question/answer" from the server. (`QuestionAnswer`)
+         */
+        public async questionAnswer(data: Routes.QuestionAnswerRequest): Promise<void> {
+            await this.fetch("post", "/question/answer", data);
         }
 
 
@@ -374,10 +386,66 @@ export class Client extends BaseClient<Endpoints> {
 
 
         /**
+         * Validates `Routes.QuestionAnswerRequest` using the generated validator.
+         */
+        public static validateRoutesQuestionAnswerRequest<Error extends string>(data: Routes.QuestionAnswerRequest, settings?: ValidationSettings): ErrorMap<Routes.QuestionAnswerRequest, Error> | null {
+            return validate<Routes.QuestionAnswerRequest, Error>(SCHEMAS["3"], data, { otherTypes: SCHEMAS, ...settings })[0];
+        }
+
+
+        /**
+         * Validates `Question<MultipleAnswerValue | OpenAnswerValue | NumberAnswerValue | LocationAnswerValue | MultipleTableAnswerValue>` using the generated validator.
+         */
+        public static validateQuestionMultipleAnswerValueOpenAnswerValueNumberAnswerValueLocationAnswerValueMultipleTableAnswerValue<Error extends string>(data: Question<MultipleAnswerValue | OpenAnswerValue | NumberAnswerValue | LocationAnswerValue | MultipleTableAnswerValue>, settings?: ValidationSettings): ErrorMap<Question<MultipleAnswerValue | OpenAnswerValue | NumberAnswerValue | LocationAnswerValue | MultipleTableAnswerValue>, Error> | null {
+            return validate<Question<MultipleAnswerValue | OpenAnswerValue | NumberAnswerValue | LocationAnswerValue | MultipleTableAnswerValue>, Error>(SCHEMAS["4"], data, { otherTypes: SCHEMAS, ...settings })[0];
+        }
+
+
+        /**
+         * Validates `MultipleAnswerValue` using the generated validator.
+         */
+        public static validateMultipleAnswerValue<Error extends string>(data: MultipleAnswerValue, settings?: ValidationSettings): ErrorMap<MultipleAnswerValue, Error> | null {
+            return validate<MultipleAnswerValue, Error>(SCHEMAS["5"], data, { otherTypes: SCHEMAS, ...settings })[0];
+        }
+
+
+        /**
+         * Validates `OpenAnswerValue` using the generated validator.
+         */
+        public static validateOpenAnswerValue<Error extends string>(data: OpenAnswerValue, settings?: ValidationSettings): ErrorMap<OpenAnswerValue, Error> | null {
+            return validate<OpenAnswerValue, Error>(SCHEMAS["6"], data, { otherTypes: SCHEMAS, ...settings })[0];
+        }
+
+
+        /**
+         * Validates `NumberAnswerValue` using the generated validator.
+         */
+        public static validateNumberAnswerValue<Error extends string>(data: NumberAnswerValue, settings?: ValidationSettings): ErrorMap<NumberAnswerValue, Error> | null {
+            return validate<NumberAnswerValue, Error>(SCHEMAS["7"], data, { otherTypes: SCHEMAS, ...settings })[0];
+        }
+
+
+        /**
+         * Validates `LocationAnswerValue` using the generated validator.
+         */
+        public static validateLocationAnswerValue<Error extends string>(data: LocationAnswerValue, settings?: ValidationSettings): ErrorMap<LocationAnswerValue, Error> | null {
+            return validate<LocationAnswerValue, Error>(SCHEMAS["8"], data, { otherTypes: SCHEMAS, ...settings })[0];
+        }
+
+
+        /**
+         * Validates `MultipleTableAnswerValue` using the generated validator.
+         */
+        public static validateMultipleTableAnswerValue<Error extends string>(data: MultipleTableAnswerValue, settings?: ValidationSettings): ErrorMap<MultipleTableAnswerValue, Error> | null {
+            return validate<MultipleTableAnswerValue, Error>(SCHEMAS["9"], data, { otherTypes: SCHEMAS, ...settings })[0];
+        }
+
+
+        /**
          * Validates `Routes.UserGetRequest` using the generated validator.
          */
         public static validateRoutesUserGetRequest<Error extends string>(data: Routes.UserGetRequest, settings?: ValidationSettings): ErrorMap<Routes.UserGetRequest, Error> | null {
-            return validate<Routes.UserGetRequest, Error>(SCHEMAS["3"], data, { otherTypes: SCHEMAS, ...settings })[0];
+            return validate<Routes.UserGetRequest, Error>(SCHEMAS["10"], data, { otherTypes: SCHEMAS, ...settings })[0];
         }
 
 
@@ -385,7 +453,7 @@ export class Client extends BaseClient<Endpoints> {
          * Validates `Routes.UserCreateRequest` using the generated validator.
          */
         public static validateRoutesUserCreateRequest<Error extends string>(data: Routes.UserCreateRequest, settings?: ValidationSettings): ErrorMap<Routes.UserCreateRequest, Error> | null {
-            return validate<Routes.UserCreateRequest, Error>(SCHEMAS["4"], data, { otherTypes: SCHEMAS, ...settings })[0];
+            return validate<Routes.UserCreateRequest, Error>(SCHEMAS["11"], data, { otherTypes: SCHEMAS, ...settings })[0];
         }
 }
 
@@ -469,6 +537,112 @@ const SCHEMAS = {
     "3": {
         "type": "objectLiteral",
         "fields": {
+            "answer": {
+                "type": "ref",
+                "name": "4"
+            }
+        }
+    },
+    "4": {
+        "type": "objectLiteral",
+        "fields": {
+            "name": {
+                "type": "string"
+            },
+            "answer": {
+                "type": "or",
+                "schemas": [
+                    {
+                        "type": "ref",
+                        "name": "5"
+                    },
+                    {
+                        "type": "ref",
+                        "name": "6"
+                    },
+                    {
+                        "type": "ref",
+                        "name": "7"
+                    },
+                    {
+                        "type": "ref",
+                        "name": "8"
+                    },
+                    {
+                        "type": "ref",
+                        "name": "9"
+                    }
+                ]
+            }
+        }
+    },
+    "5": {
+        "type": "objectLiteral",
+        "fields": {
+            "selected": {
+                "type": "array",
+                "itemType": {
+                    "type": "string",
+                    "max": 1000
+                }
+            },
+            "other": {
+                "type": "or",
+                "schemas": [
+                    {
+                        "type": "undefined"
+                    },
+                    {
+                        "type": "string",
+                        "max": 1000
+                    }
+                ]
+            }
+        }
+    },
+    "6": {
+        "type": "objectLiteral",
+        "fields": {
+            "value": {
+                "type": "string",
+                "max": 1000
+            }
+        }
+    },
+    "7": {
+        "type": "objectLiteral",
+        "fields": {
+            "value": {
+                "type": "number"
+            }
+        }
+    },
+    "8": {
+        "type": "objectLiteral",
+        "fields": {
+            "address": {
+                "type": "never"
+            }
+        }
+    },
+    "9": {
+        "type": "objectLiteral",
+        "fields": {
+            "selected": {
+                "type": "array",
+                "itemType": {
+                    "type": "array",
+                    "itemType": {
+                        "type": "string",
+                        "max": 100
+                    }
+                }
+            }
+        }
+    },
+    "10": {
+        "type": "objectLiteral",
+        "fields": {
             "userId": {
                 "type": "number",
                 "min": 0,
@@ -477,7 +651,7 @@ const SCHEMAS = {
             }
         }
     },
-    "4": {
+    "11": {
         "type": "objectLiteral",
         "fields": {
             "email": {

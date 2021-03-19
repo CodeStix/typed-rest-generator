@@ -43,7 +43,7 @@ export function splitCapitalized(str: string) {
  * Get fully qualified type name without the import("asfasdf") statements
  */
 export function getFullTypeName(type: ts.Type, checker: ts.TypeChecker) {
-    return checker.typeToString(type, undefined, ts.TypeFormatFlags.UseFullyQualifiedType).replace(/import\(\"[^\"]+\"\)\./g, "");
+    return checker.typeToString(type, undefined, ts.TypeFormatFlags.UseFullyQualifiedType | ts.TypeFormatFlags.NoTypeReduction).replace(/import\(\"[^\"]+\"\)\./g, "");
 }
 
 export function getSymbolImportName(symbol: ts.Symbol): string {

@@ -54,13 +54,52 @@ export type Post = {
 };
 
 export type QuestionType = "multiple" | "open" | "number" | "location" | "title" | "multipletable";
-export interface Yiesk<T> {
-    data: T;
+
+export interface MultipleAnswerValue {
+    /**
+     * @v-max 1000
+     */
+    selected: string[];
+    /**
+     * @v-max 1000
+     */
+    other?: string;
 }
+
+export interface OpenAnswerValue {
+    /**
+     * @v-max 1000
+     */
+    value: string;
+}
+
+export interface NumberAnswerValue {
+    value: number;
+}
+
+export interface LocationAnswerValue {
+    address: never;
+}
+
+export interface Question<T = MultipleAnswerValue | OpenAnswerValue | NumberAnswerValue | LocationAnswerValue | MultipleTableAnswerValue> {
+    name: string;
+    answer: T;
+}
+export interface MultipleTableAnswerValue {
+    /**
+     * @v-max 100
+     */
+    selected: string[][];
+}
+
 export namespace Routes {
     export interface UpdateEventRequest {
         test: Omit<Test, "events">;
         notifyUsers?: boolean;
+    }
+
+    export interface QuestionAnswerRequest {
+        answer: Question;
     }
 
     export interface UserListResponse {
