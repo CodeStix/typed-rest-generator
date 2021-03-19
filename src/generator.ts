@@ -152,7 +152,7 @@ export function generateCode(typeChecker: ts.TypeChecker, paths: PathTypes, outp
         /**
          * Validates \`${name}\` using the generated validator.
          */
-        public static validate${sanitizedTypeName}<Error extends string>(data: ${name}, settings?: ValidationSettings): ErrorType<${name}, Error> | null {
+        public static validate${sanitizedTypeName}<Error extends string>(data: ${name}, settings?: ValidationSettings): ErrorMap<${name}, Error> | null {
             return validate<${name}, Error>(SCHEMAS[${JSON.stringify(serializedName)}], data, { otherTypes: SCHEMAS, ...settings })[0];
         }`);
     });
