@@ -1,8 +1,20 @@
 import ts from "byots";
 import fs from "fs";
 import path from "path";
-import { decapitalize, splitCapitalized, getSymbolUsageName, getMostSuitableDeclaration, getSymbolFullName, getSymbolImportName, isDefaultType, getFullTypeName } from "./helpers";
-import { createSchemaForTypeDeclaration, TypeSchema } from "./typeExtractor";
+import { typeFlagsToString } from "../dist/helpers";
+import {
+    decapitalize,
+    splitCapitalized,
+    getSymbolUsageName,
+    getMostSuitableDeclaration,
+    getSymbolFullName,
+    getSymbolImportName,
+    isDefaultType,
+    getFullTypeName,
+    capitalize,
+    nodeFlagsToString,
+} from "./helpers";
+import { createSchemaForTypeDeclaration, TypeSchema, RootTypes, rootTypesToTypes } from "./typeExtractor";
 
 export type PathTypes = {
     [path: string]: EndPoint;
@@ -84,9 +96,7 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, paths: PathT
     let clientClassMethodImplementations: string[] = [];
     let typesToImport = new Set<ts.Symbol>();
     let endPointsTypings: string[] = [];
-    let typeSchemas: {
-        [typeName: string]: TypeSchema;
-    } = {};
+    let typeSchemas: RootTypes = {};
     let pathTypes: {
         [path: string]: string;
     } = {};
@@ -132,25 +142,27 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, paths: PathT
                 typeSchemas
             );
             pathTypes[path] = getFullTypeName(endpoint.req.type, typeChecker);
-
-            // clientClassMethodImplementations.push(`
-            // /**
-            //  * Validates \`${usageName}\` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-            //  */
-            // public static validate${name}<Error extends string>(data: ${usageName}, settings: ValidationSettings = { }): ErrorType<${usageName}, Error> | null {
-            //     return validate<${usageName}, Error>(SCHEMAS.${name}, data, { otherTypes: SCHEMAS, ...settings })[0];
-            // }`);
         }
     });
 
-    Object.keys(typeSchemas).forEach((schema) => {
-        let san = schema.split(/[^a-zA-Z]/).join("");
+    Object.keys(typeSchemas).forEach((typeName) => {
+        let type = typeSchemas[typeName];
+        typesToImport.add(type.type.aliasSymbol ?? type.type.symbol);
+        type.type.aliasTypeArguments?.forEach((e) => {
+            let sym = e.aliasSymbol ?? e.symbol;
+            if (sym) typesToImport.add(sym);
+        });
+
+        let sanitizedTypeName = typeName
+            .split(/[^a-zA-Z]/)
+            .map((e) => capitalize(e))
+            .join("");
         clientClassMethodImplementations.push(`
         /**
-         * Validates \`${schema}\` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         * Validates \`${typeName}\` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
          */
-        public static validate${san}<Error extends string>(data: ${schema}, settings: ValidationSettings = { }): ErrorType<${schema}, Error> | null {
-            return validate<${schema}, Error>(SCHEMAS[${JSON.stringify(schema)}], data, { otherTypes: SCHEMAS, ...settings })[0];
+        public static validate${sanitizedTypeName}<Error extends string>(data: ${typeName}, settings?: ValidationSettings): ErrorType<${typeName}, Error> | null {
+            return validate<${typeName}, Error>(SCHEMAS[${JSON.stringify(typeName)}], data, { otherTypes: SCHEMAS, ...settings })[0];
         }`);
     });
 
@@ -207,6 +219,6 @@ export class Client extends BaseClient<Endpoints> {
 ${clientClassMethodImplementations.join("\n\n")}
 }
 
-const SCHEMAS = ${JSON.stringify(typeSchemas, null, 4)} as const;
+const SCHEMAS = ${JSON.stringify(rootTypesToTypes(typeSchemas), null, 4)} as const;
     `);
 }

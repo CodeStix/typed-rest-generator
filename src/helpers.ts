@@ -1,7 +1,13 @@
 import ts from "byots";
 
 export function decapitalize(str: string) {
+    if (!str) return str;
     return str[0].toLowerCase() + str.substring(1);
+}
+
+export function capitalize(str: string) {
+    if (!str) return str;
+    return str[0].toUpperCase() + str.substring(1);
 }
 
 export function isUpperCase(str: string, at: number) {
@@ -25,6 +31,9 @@ export function splitCapitalized(str: string) {
     return parts;
 }
 
+/**
+ * Get fully qualified type name without the import("asfasdf") statements
+ */
 export function getFullTypeName(type: ts.Type, checker: ts.TypeChecker) {
     return checker.typeToString(type, undefined, ts.TypeFormatFlags.UseFullyQualifiedType).replace(/import\(\"[^\"]+\"\)\./g, "");
 }
@@ -68,6 +77,17 @@ export function typeFlagsToString(flags: ts.TypeFlags): string {
     let fl: string[] = [];
     for (let a in ts.TypeFlags) {
         let n = parseInt(ts.TypeFlags[a]);
+        if ((flags & n) === n) {
+            fl.push(a);
+        }
+    }
+    return fl.join(",");
+}
+
+export function nodeFlagsToString(flags: ts.NodeFlags): string {
+    let fl: string[] = [];
+    for (let a in ts.NodeFlags) {
+        let n = parseInt(ts.NodeFlags[a]);
         if ((flags & n) === n) {
             fl.push(a);
         }

@@ -1,11 +1,17 @@
 import ts, { breakIntoCharacterSpans } from "byots";
-import { symbolHasFlag, symbolFlagsToString, typeFlagsToString, getSymbolUsageName, getFullTypeName } from "./helpers";
+import { symbolHasFlag, symbolFlagsToString, typeFlagsToString, getSymbolUsageName, getFullTypeName, isDefaultType } from "./helpers";
 
 export type JSDocProps = {
     [prop: string]: string;
 };
 export type Types = {
     [name: string]: TypeSchema;
+};
+export type RootTypes = {
+    [name: string]: {
+        type: ts.ObjectType;
+        schema: TypeSchema;
+    };
 };
 export type NumberTypeSchema = { type: "number"; min?: number; max?: number; minMessage?: string; maxMessage?: string };
 export type StringTypeSchema = { type: "string"; min?: number; max?: number; regex?: string; minMessage?: string; maxMessage?: string; regexMessage?: string };
@@ -32,16 +38,14 @@ export type TypeSchema =
 
 export const SKIP_TYPES = ["Date", "Decimal", "Function"];
 
-export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeChecker, otherTypes: Types): TypeSchema {
-    // Get fully qualified type name without the import("asfasdf") statements
+export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeChecker, otherTypes: RootTypes): TypeSchema {
     let fullName = getFullTypeName(type, checker);
     let sym = type.aliasSymbol ?? type.symbol;
     let isInline = sym.name === "__type";
-    console.log("Fullname", fullName, isInline);
 
     let schema: TypeSchema = { type: "objectLiteral", fields: {} };
     if (!isInline) {
-        if (sym.declarations![0].getSourceFile().fileName.includes("node_modules/typescript/")) {
+        if (isDefaultType(sym)) {
             if (fullName === "Date") {
                 return { type: "date" };
             }
@@ -49,7 +53,7 @@ export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeC
         }
 
         if (fullName in otherTypes) return { type: "ref", name: fullName };
-        otherTypes[fullName] = schema;
+        otherTypes[fullName] = { type, schema };
     }
 
     let properties = checker.getAugmentedPropertiesOfType(type);
@@ -73,7 +77,7 @@ export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeC
     return !isInline ? { type: "ref", name: fullName } : schema;
 }
 
-export function createSchemaForType(type: ts.Type, checker: ts.TypeChecker, otherTypes: Types, customProps: JSDocProps = {}): TypeSchema {
+export function createSchemaForType(type: ts.Type, checker: ts.TypeChecker, otherTypes: RootTypes, customProps: JSDocProps = {}): TypeSchema {
     switch (type.flags) {
         case ts.TypeFlags.Object: {
             if (checker.isTupleType(type)) {
@@ -135,11 +139,9 @@ export function createSchemaForType(type: ts.Type, checker: ts.TypeChecker, othe
     }
 }
 
-export function createSchemaForTypeDeclaration(e: ts.InterfaceDeclaration | ts.ClassDeclaration | ts.TypeAliasDeclaration, checker: ts.TypeChecker, output: Types) {
+export function createSchemaForTypeDeclaration(e: ts.InterfaceDeclaration | ts.ClassDeclaration | ts.TypeAliasDeclaration, checker: ts.TypeChecker, output: RootTypes) {
     if ((ts.isInterfaceDeclaration(e) || ts.isClassDeclaration(e) || ts.isTypeAliasDeclaration(e)) && e.name) {
-        let name = e.name.text;
-        let t = createSchemaForType(checker.getTypeAtLocation(e), checker, output);
-        // if (!output[name]) output[name] = t;
+        createSchemaForType(checker.getTypeAtLocation(e), checker, output);
     } else {
         throw new Error(`Unsupported declaration type \`${ts.NodeFlags[e.flags]}\``);
     }
@@ -214,4 +216,10 @@ function createNormalSchema(customProps: JSDocProps, schema: TypeSchema): TypeSc
     let keys = Object.keys(customProps);
     if (keys.length !== 0) throw new Error(`${schema.type} does not support validator \`@v-${keys[0]}\``);
     return schema;
+}
+
+export function rootTypesToTypes(rootTypes: RootTypes): Types {
+    let obj: Types = {};
+    Object.keys(rootTypes).forEach((e) => (obj[e] = rootTypes[e].schema));
+    return obj;
 }

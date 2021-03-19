@@ -54,7 +54,9 @@ export type Post = {
 };
 
 export type QuestionType = "multiple" | "open" | "number" | "location" | "title" | "multipletable";
-
+export interface Yiesk<T> {
+    data: T;
+}
 export namespace Routes {
     export interface UpdateEventRequest {
         test: Omit<Test, "events">;
@@ -70,6 +72,11 @@ export namespace Routes {
          * @v-min 0 Must be larger than 0
          */
         userId: number;
+        data: {
+            yes: boolean;
+            date: Date;
+            val: Yiesk<number>;
+        };
     }
 
     export interface UserGetResponse {
