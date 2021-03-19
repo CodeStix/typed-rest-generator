@@ -1,7 +1,7 @@
 import ts from "byots";
 import fs from "fs";
 import path from "path";
-import { decapitalize, splitCapitalized, getSymbolUsageName, getMostSuitableDeclaration, getSymbolFullName, getSymbolImportName, isDefaultType } from "./helpers";
+import { decapitalize, splitCapitalized, getSymbolUsageName, getMostSuitableDeclaration, getSymbolFullName, getSymbolImportName, isDefaultType, getFullTypeName } from "./helpers";
 import { createSchemaForTypeDeclaration, TypeSchema } from "./typeExtractor";
 
 export type PathTypes = {
@@ -9,12 +9,10 @@ export type PathTypes = {
 };
 export type EndPoint = {
     req?: {
-        symbol: ts.Symbol;
-        deepReferences: Set<ts.Symbol>;
+        type: ts.Type;
     };
     res?: {
-        symbol: ts.Symbol;
-        deepReferences: Set<ts.Symbol>;
+        type: ts.Type;
     };
 };
 export type ApiType = keyof EndPoint;
@@ -45,7 +43,7 @@ export function registerRouteType(node: ts.Node, typeChecker: ts.TypeChecker, pa
             paths[pathType] = {
                 ...paths[pathType],
                 [apiType]: {
-                    symbol: typeChecker.getSymbolAtLocation(node.name!),
+                    type: typeChecker.getDeclaredTypeOfSymbol(typeChecker.getSymbolAtLocation(node.name!)!),
                 },
             };
         } else if (throwOnNoMatch) {
@@ -103,13 +101,13 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, paths: PathT
             let node = endpoint[apiType as ApiType];
             if (!node) return;
 
-            typesToImport.add(node.symbol);
+            typesToImport.add(node.type.aliasSymbol ?? node.type.symbol);
         });
 
         let path = typeNameToPath(pathTypeName);
         let functionName = decapitalize(pathTypeName);
-        let reqType = endpoint.req ? getSymbolUsageName(endpoint.req.symbol) : null;
-        let resType = endpoint.res ? getSymbolUsageName(endpoint.res.symbol) : null;
+        let reqType = endpoint.req ? getFullTypeName(endpoint.req.type, typeChecker) : null;
+        let resType = endpoint.res ? getFullTypeName(endpoint.res.type, typeChecker) : null;
         console.log(`${path} --> ${functionName}`);
 
         // Create client fetch function
@@ -128,24 +126,32 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, paths: PathT
         },\n`);
 
         if (endpoint.req) {
-            let name = endpoint.req.symbol.name;
-            let usageName = getSymbolUsageName(endpoint.req.symbol);
-            //  pathValidators[path] = getSymbolFullName(endpoint.req.symbol);
             createSchemaForTypeDeclaration(
-                endpoint.req.symbol.declarations![0] as ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration,
+                (endpoint.req.type.aliasSymbol ?? endpoint.req.type.symbol).declarations![0] as ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration,
                 typeChecker,
                 typeSchemas
             );
-            pathTypes[path] = name;
+            pathTypes[path] = getFullTypeName(endpoint.req.type, typeChecker);
 
-            clientClassMethodImplementations.push(`
-            /**
-             * Validates \`${usageName}\` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-             */
-            public static validate${name}<Error extends string>(data: ${usageName}, settings: ValidationSettings = { }): ErrorType<${usageName}, Error> | null {
-                return validate<${usageName}, Error>(SCHEMAS.${name}, data, { otherTypes: SCHEMAS, ...settings })[0];
-            }`);
+            // clientClassMethodImplementations.push(`
+            // /**
+            //  * Validates \`${usageName}\` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+            //  */
+            // public static validate${name}<Error extends string>(data: ${usageName}, settings: ValidationSettings = { }): ErrorType<${usageName}, Error> | null {
+            //     return validate<${usageName}, Error>(SCHEMAS.${name}, data, { otherTypes: SCHEMAS, ...settings })[0];
+            // }`);
         }
+    });
+
+    Object.keys(typeSchemas).forEach((schema) => {
+        let san = schema.split(/[^a-zA-Z]/).join("");
+        clientClassMethodImplementations.push(`
+        /**
+         * Validates \`${schema}\` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validate${san}<Error extends string>(data: ${schema}, settings: ValidationSettings = { }): ErrorType<${schema}, Error> | null {
+            return validate<${schema}, Error>(SCHEMAS[${JSON.stringify(schema)}], data, { otherTypes: SCHEMAS, ...settings })[0];
+        }`);
     });
 
     endPointsTypings.push(`}\n\n`);

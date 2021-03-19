@@ -25,6 +25,10 @@ export function splitCapitalized(str: string) {
     return parts;
 }
 
+export function getFullTypeName(type: ts.Type, checker: ts.TypeChecker) {
+    return checker.typeToString(type, undefined, ts.TypeFormatFlags.UseFullyQualifiedType).replace(/import\(\"[^\"]+\"\)\./g, "");
+}
+
 export function getSymbolImportName(symbol: ts.Symbol): string {
     if (!symbol.parent?.parent) return symbol.name;
     return getSymbolImportName(symbol.parent);

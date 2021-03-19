@@ -251,7 +251,9 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
         });
 
         if (res.status <= 400) {
-            return await res.json();
+            let text = (await res.text()).trim();
+            if (!text) return undefined as any;
+            return JSON.parse(text);
         } else if (res.status === 406) {
             throw new ValidationError("Validation error", await res.json());
         } else if (res.status === 429) {
@@ -263,232 +265,238 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
         }
     }
 }
-import { UserRoutes } from "./userRoutes"
-import { Routes } from "./index"
+import { UserRoutes } from "./userRoutes";
+import { Routes, Test } from "./index";
 
 const PATH_VALIDATORS: {
-        [Key in keyof Endpoints]?: keyof typeof SCHEMAS;
-    } = {"/routes":"RoutesRequest","/update/event":"UpdateEventRequest","/user/get":"UserGetRequest","/user/create":"UserCreateRequest"}
+    [Key in keyof Endpoints]?: keyof typeof SCHEMAS;
+} = { "/routes": "UserRoutes.RoutesRequest", "/update/event": "Routes.UpdateEventRequest", "/user/get": "Routes.UserGetRequest", "/user/create": "Routes.UserCreateRequest" };
 
 export type Endpoints = {
-		"/routes": {
-            req: UserRoutes.RoutesRequest,
-            res: never,
-        },
-		"/update/event": {
-            req: Routes.UpdateEventRequest,
-            res: never,
-        },
-		"/user/list": {
-            req: never,
-            res: Routes.UserListResponse,
-        },
-		"/user/get": {
-            req: Routes.UserGetRequest,
-            res: Routes.UserGetResponse,
-        },
-		"/user/create": {
-            req: Routes.UserCreateRequest,
-            res: Routes.UserCreateResponse,
-        },
-}
+    "/routes": {
+        req: UserRoutes.RoutesRequest;
+        res: never;
+    };
+    "/update/event": {
+        req: Routes.UpdateEventRequest;
+        res: never;
+    };
+    "/user/list": {
+        req: never;
+        res: Routes.UserListResponse;
+    };
+    "/user/get": {
+        req: Routes.UserGetRequest;
+        res: Routes.UserGetResponse;
+    };
+    "/user/create": {
+        req: Routes.UserCreateRequest;
+        res: Routes.UserCreateResponse;
+    };
+};
 
-
-
-const VERSION = "1.0.10";
+const VERSION = "1.0.13";
 
 export class Client extends BaseClient<Endpoints> {
-    
+    /**
+     * Fetches "/routes" from the server. (`Routes`)
+     */
+    public async routes(data: UserRoutes.RoutesRequest): Promise<void> {
+        await this.fetch("post", "/routes", data);
+    }
 
-        /**
-         * Fetches "/routes" from the server. (`Routes`)
-         */
-        public async routes(data: UserRoutes.RoutesRequest): Promise<void> {
-            await this.fetch("post", "/routes", data);
-        }
+    /**
+     * Fetches "/update/event" from the server. (`UpdateEvent`)
+     */
+    public async updateEvent(data: Routes.UpdateEventRequest): Promise<void> {
+        await this.fetch("post", "/update/event", data);
+    }
 
+    /**
+     * Fetches "/user/list" from the server. (`UserList`)
+     */
+    public async userList(): Promise<Routes.UserListResponse> {
+        return await this.fetch("post", "/user/list");
+    }
 
-            /**
-             * Validates `UserRoutes.RoutesRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-             */
-            public static validateRoutesRequest<Error extends string>(data: UserRoutes.RoutesRequest, settings: ValidationSettings = { }): ErrorType<UserRoutes.RoutesRequest, Error> | null {
-                return validate<UserRoutes.RoutesRequest, Error>(SCHEMAS.RoutesRequest, data, { otherTypes: SCHEMAS, ...settings })[0];
-            }
+    /**
+     * Fetches "/user/get" from the server. (`UserGet`)
+     */
+    public async userGet(data: Routes.UserGetRequest): Promise<Routes.UserGetResponse> {
+        return await this.fetch("post", "/user/get", data);
+    }
 
+    /**
+     * Fetches "/user/create" from the server. (`UserCreate`)
+     */
+    public async userCreate(data: Routes.UserCreateRequest): Promise<Routes.UserCreateResponse> {
+        return await this.fetch("post", "/user/create", data);
+    }
 
-        /**
-         * Fetches "/update/event" from the server. (`UpdateEvent`)
-         */
-        public async updateEvent(data: Routes.UpdateEventRequest): Promise<void> {
-            await this.fetch("post", "/update/event", data);
-        }
+    /**
+     * Validates `UserRoutes.RoutesRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+     */
+    public static validateUserRoutesRoutesRequest<Error extends string>(
+        data: UserRoutes.RoutesRequest,
+        settings: ValidationSettings = {}
+    ): ErrorType<UserRoutes.RoutesRequest, Error> | null {
+        return validate<UserRoutes.RoutesRequest, Error>(SCHEMAS["UserRoutes.RoutesRequest"], data, { otherTypes: SCHEMAS, ...settings })[0];
+    }
 
+    /**
+     * Validates `Routes.UpdateEventRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+     */
+    public static validateRoutesUpdateEventRequest<Error extends string>(
+        data: Routes.UpdateEventRequest,
+        settings: ValidationSettings = {}
+    ): ErrorType<Routes.UpdateEventRequest, Error> | null {
+        return validate<Routes.UpdateEventRequest, Error>(SCHEMAS["Routes.UpdateEventRequest"], data, { otherTypes: SCHEMAS, ...settings })[0];
+    }
 
-            /**
-             * Validates `Routes.UpdateEventRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-             */
-            public static validateUpdateEventRequest<Error extends string>(data: Routes.UpdateEventRequest, settings: ValidationSettings = { }): ErrorType<Routes.UpdateEventRequest, Error> | null {
-                return validate<Routes.UpdateEventRequest, Error>(SCHEMAS.UpdateEventRequest, data, { otherTypes: SCHEMAS, ...settings })[0];
-            }
+    /**
+     * Validates `Omit<Test, "events">` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+     */
+    public static validateOmitTestevents<Error extends string>(data: Omit<Test, "events">, settings: ValidationSettings = {}): ErrorType<Omit<Test, "events">, Error> | null {
+        return validate<Omit<Test, "events">, Error>(SCHEMAS['Omit<Test, "events">'], data, { otherTypes: SCHEMAS, ...settings })[0];
+    }
 
+    /**
+     * Validates `Routes.UserGetRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+     */
+    public static validateRoutesUserGetRequest<Error extends string>(
+        data: Routes.UserGetRequest,
+        settings: ValidationSettings = {}
+    ): ErrorType<Routes.UserGetRequest, Error> | null {
+        return validate<Routes.UserGetRequest, Error>(SCHEMAS["Routes.UserGetRequest"], data, { otherTypes: SCHEMAS, ...settings })[0];
+    }
 
-        /**
-         * Fetches "/user/list" from the server. (`UserList`)
-         */
-        public async userList(): Promise<Routes.UserListResponse> {
-            return await this.fetch("post", "/user/list");
-        }
-
-
-        /**
-         * Fetches "/user/get" from the server. (`UserGet`)
-         */
-        public async userGet(data: Routes.UserGetRequest): Promise<Routes.UserGetResponse> {
-            return await this.fetch("post", "/user/get", data);
-        }
-
-
-            /**
-             * Validates `Routes.UserGetRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-             */
-            public static validateUserGetRequest<Error extends string>(data: Routes.UserGetRequest, settings: ValidationSettings = { }): ErrorType<Routes.UserGetRequest, Error> | null {
-                return validate<Routes.UserGetRequest, Error>(SCHEMAS.UserGetRequest, data, { otherTypes: SCHEMAS, ...settings })[0];
-            }
-
-
-        /**
-         * Fetches "/user/create" from the server. (`UserCreate`)
-         */
-        public async userCreate(data: Routes.UserCreateRequest): Promise<Routes.UserCreateResponse> {
-            return await this.fetch("post", "/user/create", data);
-        }
-
-
-            /**
-             * Validates `Routes.UserCreateRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-             */
-            public static validateUserCreateRequest<Error extends string>(data: Routes.UserCreateRequest, settings: ValidationSettings = { }): ErrorType<Routes.UserCreateRequest, Error> | null {
-                return validate<Routes.UserCreateRequest, Error>(SCHEMAS.UserCreateRequest, data, { otherTypes: SCHEMAS, ...settings })[0];
-            }
+    /**
+     * Validates `Routes.UserCreateRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+     */
+    public static validateRoutesUserCreateRequest<Error extends string>(
+        data: Routes.UserCreateRequest,
+        settings: ValidationSettings = {}
+    ): ErrorType<Routes.UserCreateRequest, Error> | null {
+        return validate<Routes.UserCreateRequest, Error>(SCHEMAS["Routes.UserCreateRequest"], data, { otherTypes: SCHEMAS, ...settings })[0];
+    }
 }
 
 const SCHEMAS = {
-    "RoutesRequest": {
-        "type": "objectLiteral",
-        "fields": {
-            "name": {
-                "type": "string"
-            }
-        }
-    },
-    "UpdateEventRequest": {
-        "type": "objectLiteral",
-        "fields": {
-            "test": {
-                "type": "ref",
-                "name": "Omit<Test, \"events\">"
+    "UserRoutes.RoutesRequest": {
+        type: "objectLiteral",
+        fields: {
+            name: {
+                type: "string",
             },
-            "notifyUsers": {
-                "type": "or",
-                "schemas": [
+        },
+    },
+    "Routes.UpdateEventRequest": {
+        type: "objectLiteral",
+        fields: {
+            test: {
+                type: "ref",
+                name: 'Omit<Test, "events">',
+            },
+            notifyUsers: {
+                type: "or",
+                schemas: [
                     {
-                        "type": "undefined"
+                        type: "undefined",
                     },
                     {
-                        "type": "booleanLiteral",
-                        "value": false
+                        type: "booleanLiteral",
+                        value: false,
                     },
                     {
-                        "type": "booleanLiteral",
-                        "value": true
-                    }
-                ]
-            }
-        }
+                        type: "booleanLiteral",
+                        value: true,
+                    },
+                ],
+            },
+        },
     },
-    "Omit<Test, \"events\">": {
-        "type": "objectLiteral",
-        "fields": {
-            "id": {
-                "type": "or",
-                "schemas": [
+    'Omit<Test, "events">': {
+        type: "objectLiteral",
+        fields: {
+            id: {
+                type: "or",
+                schemas: [
                     {
-                        "type": "undefined"
+                        type: "undefined",
                     },
                     {
-                        "type": "number"
-                    }
-                ]
+                        type: "number",
+                    },
+                ],
             },
-            "name": {
-                "type": "string"
+            name: {
+                type: "string",
             },
-            "duration": {
-                "type": "number"
+            duration: {
+                type: "number",
             },
-            "reward": {
-                "type": "number"
+            reward: {
+                type: "number",
             },
-            "description": {
-                "type": "string"
+            description: {
+                type: "string",
             },
-            "minAge": {
-                "type": "number"
+            minAge: {
+                type: "number",
             },
-            "maxAge": {
-                "type": "number"
+            maxAge: {
+                type: "number",
             },
-            "language": {
-                "type": "string"
+            language: {
+                type: "string",
             },
-            "createdTimeStamp": {
-                "type": "number"
+            createdTimeStamp: {
+                type: "number",
             },
-            "notifiedUsers": {
-                "type": "boolean"
-            }
-        }
+            notifiedUsers: {
+                type: "boolean",
+            },
+        },
     },
-    "UserGetRequest": {
-        "type": "objectLiteral",
-        "fields": {
-            "userId": {
-                "type": "number",
-                "min": 0,
-                "minMessage": "Must be larger than 0"
-            }
-        }
+    "Routes.UserGetRequest": {
+        type: "objectLiteral",
+        fields: {
+            userId: {
+                type: "number",
+                min: 0,
+                minMessage: "Must be larger than 0",
+            },
+        },
     },
-    "UserCreateRequest": {
-        "type": "objectLiteral",
-        "fields": {
-            "email": {
-                "type": "string",
-                "regex": "^\\S+@\\S+\\.\\S+",
-                "regexMessage": "Invalid email"
+    "Routes.UserCreateRequest": {
+        type: "objectLiteral",
+        fields: {
+            email: {
+                type: "string",
+                regex: "^\\S+@\\S+\\.\\S+",
+                regexMessage: "Invalid email",
             },
-            "password": {
-                "type": "string",
-                "min": 1,
-                "minMessage": "Password must be longer"
+            password: {
+                type: "string",
+                min: 1,
+                minMessage: "Password must be longer",
             },
-            "birthDate": {
-                "type": "date"
+            birthDate: {
+                type: "date",
             },
-            "gender": {
-                "type": "or",
-                "schemas": [
+            gender: {
+                type: "or",
+                schemas: [
                     {
-                        "type": "stringLiteral",
-                        "value": "male"
+                        type: "stringLiteral",
+                        value: "male",
                     },
                     {
-                        "type": "stringLiteral",
-                        "value": "female"
-                    }
-                ]
-            }
-        }
-    }
+                        type: "stringLiteral",
+                        value: "female",
+                    },
+                ],
+            },
+        },
+    },
 } as const;
-    

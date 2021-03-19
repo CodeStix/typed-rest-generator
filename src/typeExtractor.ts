@@ -1,5 +1,5 @@
 import ts, { breakIntoCharacterSpans } from "byots";
-import { symbolHasFlag, symbolFlagsToString, typeFlagsToString } from "./helpers";
+import { symbolHasFlag, symbolFlagsToString, typeFlagsToString, getSymbolUsageName, getFullTypeName } from "./helpers";
 
 export type JSDocProps = {
     [prop: string]: string;
@@ -33,19 +33,21 @@ export type TypeSchema =
 export const SKIP_TYPES = ["Date", "Decimal", "Function"];
 
 export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeChecker, otherTypes: Types): TypeSchema {
-    let fullName = checker.typeToString(type);
+    // Get fully qualified type name without the import("asfasdf") statements
+    let fullName = getFullTypeName(type, checker);
     let sym = type.aliasSymbol ?? type.symbol;
     let isInline = sym.name === "__type";
-
-    if (!isInline && sym.declarations![0].getSourceFile().fileName.includes("node_modules/typescript/")) {
-        if (fullName === "Date") {
-            return { type: "date" };
-        }
-        console.warn(`Including builtin type \`${fullName}\``);
-    }
+    console.log("Fullname", fullName, isInline);
 
     let schema: TypeSchema = { type: "objectLiteral", fields: {} };
     if (!isInline) {
+        if (sym.declarations![0].getSourceFile().fileName.includes("node_modules/typescript/")) {
+            if (fullName === "Date") {
+                return { type: "date" };
+            }
+            console.warn(`Including builtin type \`${fullName}\``);
+        }
+
         if (fullName in otherTypes) return { type: "ref", name: fullName };
         otherTypes[fullName] = schema;
     }
@@ -137,7 +139,7 @@ export function createSchemaForTypeDeclaration(e: ts.InterfaceDeclaration | ts.C
     if ((ts.isInterfaceDeclaration(e) || ts.isClassDeclaration(e) || ts.isTypeAliasDeclaration(e)) && e.name) {
         let name = e.name.text;
         let t = createSchemaForType(checker.getTypeAtLocation(e), checker, output);
-        if (!output[name]) output[name] = t;
+        // if (!output[name]) output[name] = t;
     } else {
         throw new Error(`Unsupported declaration type \`${ts.NodeFlags[e.flags]}\``);
     }
