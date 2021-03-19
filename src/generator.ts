@@ -77,7 +77,7 @@ export function followImport(node: ts.ImportSpecifier, typeChecker: ts.TypeCheck
     return type.aliasSymbol ?? type.symbol;
 }
 
-export function generatePackageContent(typeChecker: ts.TypeChecker, paths: PathTypes, outputStream: fs.WriteStream, outputDirectory: string, version: string) {
+export function generateCode(typeChecker: ts.TypeChecker, paths: PathTypes, outputStream: fs.WriteStream, outputDirectory: string, version: string, obfuscaseNames: boolean) {
     // Write default types
     outputStream.write(getDefaultTypes());
 
@@ -124,33 +124,33 @@ export function generatePackageContent(typeChecker: ts.TypeChecker, paths: PathT
         },\n`);
 
         if (endpoint.req) {
-            createSchemaForTypeDeclaration(
+            let ref = createSchemaForTypeDeclaration(
                 (endpoint.req.type.aliasSymbol ?? endpoint.req.type.symbol).declarations![0] as ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration,
                 typeChecker,
                 typeSchemas
             );
-            pathTypes[path] = getFullTypeName(endpoint.req.type, typeChecker);
+            pathTypes[path] = ref.name;
         }
     });
 
-    Object.keys(typeSchemas).forEach((typeName) => {
-        let type = typeSchemas[typeName];
-        typesToImport.add(type.type.aliasSymbol ?? type.type.symbol);
-        type.type.aliasTypeArguments?.forEach((e) => {
+    Object.keys(typeSchemas).forEach((serializedName, i) => {
+        let typeSchema = typeSchemas[serializedName];
+        let name = getFullTypeName(typeSchema.type, typeChecker);
+        typesToImport.add(typeSchema.type.aliasSymbol ?? typeSchema.type.symbol);
+        typeSchema.type.aliasTypeArguments?.forEach((e) => {
             let sym = e.aliasSymbol ?? e.symbol;
             if (sym) typesToImport.add(sym);
         });
-
-        let sanitizedTypeName = typeName
+        let sanitizedTypeName = name
             .split(/[^a-zA-Z]/)
             .map((e) => capitalize(e))
             .join("");
         clientClassMethodImplementations.push(`
         /**
-         * Validates \`${typeName}\` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         * Validates \`${name}\` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
          */
-        public static validate${sanitizedTypeName}<Error extends string>(data: ${typeName}, settings?: ValidationSettings): ErrorType<${typeName}, Error> | null {
-            return validate<${typeName}, Error>(SCHEMAS[${JSON.stringify(typeName)}], data, { otherTypes: SCHEMAS, ...settings })[0];
+        public static validate${sanitizedTypeName}<Error extends string>(data: ${name}, settings?: ValidationSettings): ErrorType<${name}, Error> | null {
+            return validate<${name}, Error>(SCHEMAS[${JSON.stringify(serializedName)}], data, { otherTypes: SCHEMAS, ...settings })[0];
         }`);
     });
 

@@ -1,5 +1,6 @@
 import ts, { breakIntoCharacterSpans } from "byots";
 import { symbolHasFlag, symbolFlagsToString, typeFlagsToString, getSymbolUsageName, getFullTypeName, isDefaultType } from "./helpers";
+import crypto from "crypto";
 
 export type JSDocProps = {
     [prop: string]: string;
@@ -16,9 +17,10 @@ export type RootTypes = {
 export type NumberTypeSchema = { type: "number"; min?: number; max?: number; minMessage?: string; maxMessage?: string };
 export type StringTypeSchema = { type: "string"; min?: number; max?: number; regex?: string; minMessage?: string; maxMessage?: string; regexMessage?: string };
 export type ArrayTypeSchema = { type: "array"; itemType: TypeSchema; min?: number; max?: number; minMessage?: string; maxMessage?: string };
+export type TypeRefSchema = { type: "ref"; name: string };
 export type TypeSchema =
     | { type: "or"; schemas: readonly TypeSchema[] }
-    | { type: "ref"; name: string }
+    | TypeRefSchema
     | { type: "objectLiteral"; fields: Types }
     | ArrayTypeSchema
     | { type: "tuple"; itemTypes: readonly TypeSchema[] }
@@ -36,8 +38,15 @@ export type TypeSchema =
     | { type: "stringLiteral"; value: string }
     | { type: "booleanLiteral"; value: boolean };
 
+export interface TypeSchemaGeneratorSettings {
+    checker: ts.TypeChecker;
+    otherTypes: RootTypes;
+    obfuscateRootTypes?: boolean;
+}
+
 export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeChecker, otherTypes: RootTypes): TypeSchema {
     let fullName = getFullTypeName(type, checker);
+    let serializeName = crypto.createHash("sha1").update(fullName).digest("hex"); // fullName
     let sym = type.aliasSymbol ?? type.symbol;
     let isInline = sym.name === "__type";
 
@@ -50,8 +59,8 @@ export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeC
             console.warn(`Including builtin type \`${fullName}\``);
         }
 
-        if (fullName in otherTypes) return { type: "ref", name: fullName };
-        otherTypes[fullName] = { type, schema };
+        if (serializeName in otherTypes) return { type: "ref", name: serializeName };
+        otherTypes[serializeName] = { type, schema };
     }
 
     let properties = checker.getAugmentedPropertiesOfType(type);
@@ -72,7 +81,7 @@ export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeC
         schema.fields[property.name] = sch;
     }
 
-    return !isInline ? { type: "ref", name: fullName } : schema;
+    return !isInline ? { type: "ref", name: serializeName } : schema;
 }
 
 export function createSchemaForType(type: ts.Type, checker: ts.TypeChecker, otherTypes: RootTypes, customProps: JSDocProps = {}): TypeSchema {
@@ -137,9 +146,13 @@ export function createSchemaForType(type: ts.Type, checker: ts.TypeChecker, othe
     }
 }
 
-export function createSchemaForTypeDeclaration(e: ts.InterfaceDeclaration | ts.ClassDeclaration | ts.TypeAliasDeclaration, checker: ts.TypeChecker, output: RootTypes) {
+export function createSchemaForTypeDeclaration(
+    e: ts.InterfaceDeclaration | ts.ClassDeclaration | ts.TypeAliasDeclaration,
+    checker: ts.TypeChecker,
+    output: RootTypes
+): TypeRefSchema {
     if ((ts.isInterfaceDeclaration(e) || ts.isClassDeclaration(e) || ts.isTypeAliasDeclaration(e)) && e.name) {
-        createSchemaForType(checker.getTypeAtLocation(e), checker, output);
+        return createSchemaForType(checker.getTypeAtLocation(e), checker, output) as TypeRefSchema;
     } else {
         throw new Error(`Unsupported declaration type \`${ts.NodeFlags[e.flags]}\``);
     }

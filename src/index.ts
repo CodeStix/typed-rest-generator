@@ -3,7 +3,7 @@
 import ts from "byots";
 import fs from "fs";
 import path from "path";
-import { generatePackageContent, getRouteTypes, getRouteTypesFromRoutesNamespace, PathTypes } from "./generator";
+import { generateCode, getRouteTypes, getRouteTypesFromRoutesNamespace, PathTypes } from "./generator";
 import { Command } from "commander";
 import chokidar from "chokidar";
 
@@ -71,7 +71,7 @@ function execute(inputFile: string, outputFile: string, onlyNamespace: boolean, 
     });
 
     let output = fs.createWriteStream(outputFile);
-    generatePackageContent(checker, pathTypes, output, path.dirname(outputFile), version);
+    generateCode(checker, pathTypes, output, path.dirname(outputFile), version, true);
     output.close();
 }
 

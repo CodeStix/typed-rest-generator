@@ -67,6 +67,12 @@ export namespace Routes {
         users: User[];
     }
 
+    export type TestRequest = {
+        yikes: {
+            asdf: boolean;
+        };
+    };
+
     export interface UserGetRequest {
         /**
          * @v-min 0 Must be larger than 0
