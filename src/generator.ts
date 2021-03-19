@@ -126,8 +126,11 @@ export function generateCode(typeChecker: ts.TypeChecker, paths: PathTypes, outp
         if (endpoint.req) {
             let ref = createSchemaForTypeDeclaration(
                 (endpoint.req.type.aliasSymbol ?? endpoint.req.type.symbol).declarations![0] as ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.ClassDeclaration,
-                typeChecker,
-                typeSchemas
+                {
+                    checker: typeChecker,
+                    otherTypes: typeSchemas,
+                    obfuscateRootTypes: true,
+                }
             );
             pathTypes[path] = ref.name;
         }
@@ -147,7 +150,7 @@ export function generateCode(typeChecker: ts.TypeChecker, paths: PathTypes, outp
             .join("");
         clientClassMethodImplementations.push(`
         /**
-         * Validates \`${name}\` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         * Validates \`${name}\` using the generated validator.
          */
         public static validate${sanitizedTypeName}<Error extends string>(data: ${name}, settings?: ValidationSettings): ErrorType<${name}, Error> | null {
             return validate<${name}, Error>(SCHEMAS[${JSON.stringify(serializedName)}], data, { otherTypes: SCHEMAS, ...settings })[0];

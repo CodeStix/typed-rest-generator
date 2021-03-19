@@ -265,302 +265,304 @@ export class BaseClient<Endpoints extends EndpointsConstraint> {
         }
     }
 }
-import { UserRoutes } from "./userRoutes";
-import { Routes, Test, Yiesk } from "./index";
+import { UserRoutes } from "./userRoutes"
+import { Routes, Test, Yiesk } from "./index"
 
 const PATH_VALIDATORS: {
-    [Key in keyof Endpoints]?: keyof typeof SCHEMAS;
-} = {
-    "/routes": "55ab416818fadfc02b862f17ce7a4ccf5968b69b",
-    "/update/event": "139c8f9f197cd1601dba455cde6bd9863dde4e94",
-    "/test": "4742b89c3c3b33602ca9f7222737dd249206173c",
-    "/user/get": "67395b2138bf6f73a8d2bf02b2a243ed02f4236c",
-    "/user/create": "da1599905d2563769660dfff5394f86ec00e6200",
-};
+        [Key in keyof Endpoints]?: keyof typeof SCHEMAS;
+    } = {"/routes":"55ab416818fadfc02b862f17ce7a4ccf5968b69b","/update/event":"139c8f9f197cd1601dba455cde6bd9863dde4e94","/test":"4742b89c3c3b33602ca9f7222737dd249206173c","/user/get":"67395b2138bf6f73a8d2bf02b2a243ed02f4236c","/user/create":"da1599905d2563769660dfff5394f86ec00e6200"}
 
 export type Endpoints = {
-    "/routes": {
-        req: UserRoutes.RoutesRequest;
-        res: never;
-    };
-    "/update/event": {
-        req: Routes.UpdateEventRequest;
-        res: never;
-    };
-    "/user/list": {
-        req: never;
-        res: Routes.UserListResponse;
-    };
-    "/test": {
-        req: Routes.TestRequest;
-        res: never;
-    };
-    "/user/get": {
-        req: Routes.UserGetRequest;
-        res: Routes.UserGetResponse;
-    };
-    "/user/create": {
-        req: Routes.UserCreateRequest;
-        res: Routes.UserCreateResponse;
-    };
-};
+		"/routes": {
+            req: UserRoutes.RoutesRequest,
+            res: never,
+        },
+		"/update/event": {
+            req: Routes.UpdateEventRequest,
+            res: never,
+        },
+		"/user/list": {
+            req: never,
+            res: Routes.UserListResponse,
+        },
+		"/test": {
+            req: Routes.TestRequest,
+            res: never,
+        },
+		"/user/get": {
+            req: Routes.UserGetRequest,
+            res: Routes.UserGetResponse,
+        },
+		"/user/create": {
+            req: Routes.UserCreateRequest,
+            res: Routes.UserCreateResponse,
+        },
+}
+
+
 
 const VERSION = "1.0.14";
 
 export class Client extends BaseClient<Endpoints> {
-    /**
-     * Fetches "/routes" from the server. (`Routes`)
-     */
-    public async routes(data: UserRoutes.RoutesRequest): Promise<void> {
-        await this.fetch("post", "/routes", data);
-    }
+    
 
-    /**
-     * Fetches "/update/event" from the server. (`UpdateEvent`)
-     */
-    public async updateEvent(data: Routes.UpdateEventRequest): Promise<void> {
-        await this.fetch("post", "/update/event", data);
-    }
+        /**
+         * Fetches "/routes" from the server. (`Routes`)
+         */
+        public async routes(data: UserRoutes.RoutesRequest): Promise<void> {
+            await this.fetch("post", "/routes", data);
+        }
 
-    /**
-     * Fetches "/user/list" from the server. (`UserList`)
-     */
-    public async userList(): Promise<Routes.UserListResponse> {
-        return await this.fetch("post", "/user/list");
-    }
 
-    /**
-     * Fetches "/test" from the server. (`Test`)
-     */
-    public async test(data: Routes.TestRequest): Promise<void> {
-        await this.fetch("post", "/test", data);
-    }
+        /**
+         * Fetches "/update/event" from the server. (`UpdateEvent`)
+         */
+        public async updateEvent(data: Routes.UpdateEventRequest): Promise<void> {
+            await this.fetch("post", "/update/event", data);
+        }
 
-    /**
-     * Fetches "/user/get" from the server. (`UserGet`)
-     */
-    public async userGet(data: Routes.UserGetRequest): Promise<Routes.UserGetResponse> {
-        return await this.fetch("post", "/user/get", data);
-    }
 
-    /**
-     * Fetches "/user/create" from the server. (`UserCreate`)
-     */
-    public async userCreate(data: Routes.UserCreateRequest): Promise<Routes.UserCreateResponse> {
-        return await this.fetch("post", "/user/create", data);
-    }
+        /**
+         * Fetches "/user/list" from the server. (`UserList`)
+         */
+        public async userList(): Promise<Routes.UserListResponse> {
+            return await this.fetch("post", "/user/list");
+        }
 
-    /**
-     * Validates `UserRoutes.RoutesRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-     */
-    public static validateUserRoutesRoutesRequest<Error extends string>(
-        data: UserRoutes.RoutesRequest,
-        settings?: ValidationSettings
-    ): ErrorType<UserRoutes.RoutesRequest, Error> | null {
-        return validate<UserRoutes.RoutesRequest, Error>(SCHEMAS["55ab416818fadfc02b862f17ce7a4ccf5968b69b"], data, { otherTypes: SCHEMAS, ...settings })[0];
-    }
 
-    /**
-     * Validates `Routes.UpdateEventRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-     */
-    public static validateRoutesUpdateEventRequest<Error extends string>(
-        data: Routes.UpdateEventRequest,
-        settings?: ValidationSettings
-    ): ErrorType<Routes.UpdateEventRequest, Error> | null {
-        return validate<Routes.UpdateEventRequest, Error>(SCHEMAS["139c8f9f197cd1601dba455cde6bd9863dde4e94"], data, { otherTypes: SCHEMAS, ...settings })[0];
-    }
+        /**
+         * Fetches "/test" from the server. (`Test`)
+         */
+        public async test(data: Routes.TestRequest): Promise<void> {
+            await this.fetch("post", "/test", data);
+        }
 
-    /**
-     * Validates `Omit<Test, "events">` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-     */
-    public static validateOmitTestEvents<Error extends string>(data: Omit<Test, "events">, settings?: ValidationSettings): ErrorType<Omit<Test, "events">, Error> | null {
-        return validate<Omit<Test, "events">, Error>(SCHEMAS["2a810ef90b1eb15bee037c681a3dac6a5b92c079"], data, { otherTypes: SCHEMAS, ...settings })[0];
-    }
 
-    /**
-     * Validates `Routes.TestRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-     */
-    public static validateRoutesTestRequest<Error extends string>(data: Routes.TestRequest, settings?: ValidationSettings): ErrorType<Routes.TestRequest, Error> | null {
-        return validate<Routes.TestRequest, Error>(SCHEMAS["4742b89c3c3b33602ca9f7222737dd249206173c"], data, { otherTypes: SCHEMAS, ...settings })[0];
-    }
+        /**
+         * Fetches "/user/get" from the server. (`UserGet`)
+         */
+        public async userGet(data: Routes.UserGetRequest): Promise<Routes.UserGetResponse> {
+            return await this.fetch("post", "/user/get", data);
+        }
 
-    /**
-     * Validates `Routes.UserGetRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-     */
-    public static validateRoutesUserGetRequest<Error extends string>(data: Routes.UserGetRequest, settings?: ValidationSettings): ErrorType<Routes.UserGetRequest, Error> | null {
-        return validate<Routes.UserGetRequest, Error>(SCHEMAS["67395b2138bf6f73a8d2bf02b2a243ed02f4236c"], data, { otherTypes: SCHEMAS, ...settings })[0];
-    }
 
-    /**
-     * Validates `Yiesk<number>` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-     */
-    public static validateYieskNumber<Error extends string>(data: Yiesk<number>, settings?: ValidationSettings): ErrorType<Yiesk<number>, Error> | null {
-        return validate<Yiesk<number>, Error>(SCHEMAS["0b4f3903c48a1d36eff26a5cbf56c1c3fd387914"], data, { otherTypes: SCHEMAS, ...settings })[0];
-    }
+        /**
+         * Fetches "/user/create" from the server. (`UserCreate`)
+         */
+        public async userCreate(data: Routes.UserCreateRequest): Promise<Routes.UserCreateResponse> {
+            return await this.fetch("post", "/user/create", data);
+        }
 
-    /**
-     * Validates `Routes.UserCreateRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
-     */
-    public static validateRoutesUserCreateRequest<Error extends string>(
-        data: Routes.UserCreateRequest,
-        settings?: ValidationSettings
-    ): ErrorType<Routes.UserCreateRequest, Error> | null {
-        return validate<Routes.UserCreateRequest, Error>(SCHEMAS["da1599905d2563769660dfff5394f86ec00e6200"], data, { otherTypes: SCHEMAS, ...settings })[0];
-    }
+
+        /**
+         * Validates `UserRoutes.RoutesRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validateUserRoutesRoutesRequest<Error extends string>(data: UserRoutes.RoutesRequest, settings?: ValidationSettings): ErrorType<UserRoutes.RoutesRequest, Error> | null {
+            return validate<UserRoutes.RoutesRequest, Error>(SCHEMAS["55ab416818fadfc02b862f17ce7a4ccf5968b69b"], data, { otherTypes: SCHEMAS, ...settings })[0];
+        }
+
+
+        /**
+         * Validates `Routes.UpdateEventRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validateRoutesUpdateEventRequest<Error extends string>(data: Routes.UpdateEventRequest, settings?: ValidationSettings): ErrorType<Routes.UpdateEventRequest, Error> | null {
+            return validate<Routes.UpdateEventRequest, Error>(SCHEMAS["139c8f9f197cd1601dba455cde6bd9863dde4e94"], data, { otherTypes: SCHEMAS, ...settings })[0];
+        }
+
+
+        /**
+         * Validates `Omit<Test, "events">` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validateOmitTestEvents<Error extends string>(data: Omit<Test, "events">, settings?: ValidationSettings): ErrorType<Omit<Test, "events">, Error> | null {
+            return validate<Omit<Test, "events">, Error>(SCHEMAS["2a810ef90b1eb15bee037c681a3dac6a5b92c079"], data, { otherTypes: SCHEMAS, ...settings })[0];
+        }
+
+
+        /**
+         * Validates `Routes.TestRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validateRoutesTestRequest<Error extends string>(data: Routes.TestRequest, settings?: ValidationSettings): ErrorType<Routes.TestRequest, Error> | null {
+            return validate<Routes.TestRequest, Error>(SCHEMAS["4742b89c3c3b33602ca9f7222737dd249206173c"], data, { otherTypes: SCHEMAS, ...settings })[0];
+        }
+
+
+        /**
+         * Validates `Routes.UserGetRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validateRoutesUserGetRequest<Error extends string>(data: Routes.UserGetRequest, settings?: ValidationSettings): ErrorType<Routes.UserGetRequest, Error> | null {
+            return validate<Routes.UserGetRequest, Error>(SCHEMAS["67395b2138bf6f73a8d2bf02b2a243ed02f4236c"], data, { otherTypes: SCHEMAS, ...settings })[0];
+        }
+
+
+        /**
+         * Validates `Yiesk<number>` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validateYieskNumber<Error extends string>(data: Yiesk<number>, settings?: ValidationSettings): ErrorType<Yiesk<number>, Error> | null {
+            return validate<Yiesk<number>, Error>(SCHEMAS["0b4f3903c48a1d36eff26a5cbf56c1c3fd387914"], data, { otherTypes: SCHEMAS, ...settings })[0];
+        }
+
+
+        /**
+         * Validates `Routes.UserCreateRequest` using the generated and custom validators. Generated validators only check types, custom validators should check things like string lengths.
+         */
+        public static validateRoutesUserCreateRequest<Error extends string>(data: Routes.UserCreateRequest, settings?: ValidationSettings): ErrorType<Routes.UserCreateRequest, Error> | null {
+            return validate<Routes.UserCreateRequest, Error>(SCHEMAS["da1599905d2563769660dfff5394f86ec00e6200"], data, { otherTypes: SCHEMAS, ...settings })[0];
+        }
 }
 
 const SCHEMAS = {
     "55ab416818fadfc02b862f17ce7a4ccf5968b69b": {
-        type: "objectLiteral",
-        fields: {
-            name: {
-                type: "string",
-            },
-        },
+        "type": "objectLiteral",
+        "fields": {
+            "name": {
+                "type": "string"
+            }
+        }
     },
     "139c8f9f197cd1601dba455cde6bd9863dde4e94": {
-        type: "objectLiteral",
-        fields: {
-            test: {
-                type: "ref",
-                name: "2a810ef90b1eb15bee037c681a3dac6a5b92c079",
+        "type": "objectLiteral",
+        "fields": {
+            "test": {
+                "type": "ref",
+                "name": "2a810ef90b1eb15bee037c681a3dac6a5b92c079"
             },
-            notifyUsers: {
-                type: "or",
-                schemas: [
+            "notifyUsers": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "undefined",
+                        "type": "undefined"
                     },
                     {
-                        type: "booleanLiteral",
-                        value: false,
+                        "type": "booleanLiteral",
+                        "value": false
                     },
                     {
-                        type: "booleanLiteral",
-                        value: true,
-                    },
-                ],
-            },
-        },
+                        "type": "booleanLiteral",
+                        "value": true
+                    }
+                ]
+            }
+        }
     },
     "2a810ef90b1eb15bee037c681a3dac6a5b92c079": {
-        type: "objectLiteral",
-        fields: {
-            id: {
-                type: "or",
-                schemas: [
+        "type": "objectLiteral",
+        "fields": {
+            "id": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "undefined",
+                        "type": "undefined"
                     },
                     {
-                        type: "number",
-                    },
-                ],
+                        "type": "number"
+                    }
+                ]
             },
-            name: {
-                type: "string",
+            "name": {
+                "type": "string"
             },
-            duration: {
-                type: "number",
+            "duration": {
+                "type": "number"
             },
-            reward: {
-                type: "number",
+            "reward": {
+                "type": "number"
             },
-            description: {
-                type: "string",
+            "description": {
+                "type": "string"
             },
-            minAge: {
-                type: "number",
+            "minAge": {
+                "type": "number"
             },
-            maxAge: {
-                type: "number",
+            "maxAge": {
+                "type": "number"
             },
-            language: {
-                type: "string",
+            "language": {
+                "type": "string"
             },
-            createdTimeStamp: {
-                type: "number",
+            "createdTimeStamp": {
+                "type": "number"
             },
-            notifiedUsers: {
-                type: "boolean",
-            },
-        },
+            "notifiedUsers": {
+                "type": "boolean"
+            }
+        }
     },
     "4742b89c3c3b33602ca9f7222737dd249206173c": {
-        type: "objectLiteral",
-        fields: {
-            yikes: {
-                type: "objectLiteral",
-                fields: {
-                    asdf: {
-                        type: "boolean",
-                    },
-                },
-            },
-        },
+        "type": "objectLiteral",
+        "fields": {
+            "yikes": {
+                "type": "objectLiteral",
+                "fields": {
+                    "asdf": {
+                        "type": "boolean"
+                    }
+                }
+            }
+        }
     },
     "67395b2138bf6f73a8d2bf02b2a243ed02f4236c": {
-        type: "objectLiteral",
-        fields: {
-            userId: {
-                type: "number",
-                min: 0,
-                minMessage: "Must be larger than 0",
+        "type": "objectLiteral",
+        "fields": {
+            "userId": {
+                "type": "number",
+                "min": 0,
+                "minMessage": "Must be larger than 0"
             },
-            data: {
-                type: "objectLiteral",
-                fields: {
-                    yes: {
-                        type: "boolean",
+            "data": {
+                "type": "objectLiteral",
+                "fields": {
+                    "yes": {
+                        "type": "boolean"
                     },
-                    date: {
-                        type: "date",
+                    "date": {
+                        "type": "date"
                     },
-                    val: {
-                        type: "ref",
-                        name: "0b4f3903c48a1d36eff26a5cbf56c1c3fd387914",
-                    },
-                },
-            },
-        },
+                    "val": {
+                        "type": "ref",
+                        "name": "0b4f3903c48a1d36eff26a5cbf56c1c3fd387914"
+                    }
+                }
+            }
+        }
     },
     "0b4f3903c48a1d36eff26a5cbf56c1c3fd387914": {
-        type: "objectLiteral",
-        fields: {
-            data: {
-                type: "number",
-            },
-        },
+        "type": "objectLiteral",
+        "fields": {
+            "data": {
+                "type": "number"
+            }
+        }
     },
-    da1599905d2563769660dfff5394f86ec00e6200: {
-        type: "objectLiteral",
-        fields: {
-            email: {
-                type: "string",
-                regex: "^\\S+@\\S+\\.\\S+",
-                regexMessage: "Invalid email",
+    "da1599905d2563769660dfff5394f86ec00e6200": {
+        "type": "objectLiteral",
+        "fields": {
+            "email": {
+                "type": "string",
+                "regex": "^\\S+@\\S+\\.\\S+",
+                "regexMessage": "Invalid email"
             },
-            password: {
-                type: "string",
-                min: 1,
-                minMessage: "Password must be longer",
+            "password": {
+                "type": "string",
+                "min": 1,
+                "minMessage": "Password must be longer"
             },
-            birthDate: {
-                type: "date",
+            "birthDate": {
+                "type": "date"
             },
-            gender: {
-                type: "or",
-                schemas: [
+            "gender": {
+                "type": "or",
+                "schemas": [
                     {
-                        type: "stringLiteral",
-                        value: "male",
+                        "type": "stringLiteral",
+                        "value": "male"
                     },
                     {
-                        type: "stringLiteral",
-                        value: "female",
-                    },
-                ],
-            },
-        },
-    },
+                        "type": "stringLiteral",
+                        "value": "female"
+                    }
+                ]
+            }
+        }
+    }
 } as const;
+    

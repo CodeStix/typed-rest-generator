@@ -44,9 +44,9 @@ export interface TypeSchemaGeneratorSettings {
     obfuscateRootTypes?: boolean;
 }
 
-export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeChecker, otherTypes: RootTypes): TypeSchema {
-    let fullName = getFullTypeName(type, checker);
-    let serializeName = crypto.createHash("sha1").update(fullName).digest("hex"); // fullName
+function createSchemaForObjectType(type: ts.ObjectType, settings: TypeSchemaGeneratorSettings): TypeSchema {
+    let fullName = getFullTypeName(type, settings.checker);
+    let serializeName = settings.obfuscateRootTypes ? crypto.createHash("sha1").update(fullName).digest("hex") : fullName;
     let sym = type.aliasSymbol ?? type.symbol;
     let isInline = sym.name === "__type";
 
@@ -59,11 +59,11 @@ export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeC
             console.warn(`Including builtin type \`${fullName}\``);
         }
 
-        if (serializeName in otherTypes) return { type: "ref", name: serializeName };
-        otherTypes[serializeName] = { type, schema };
+        if (serializeName in settings.otherTypes) return { type: "ref", name: serializeName };
+        settings.otherTypes[serializeName] = { type, schema };
     }
 
-    let properties = checker.getAugmentedPropertiesOfType(type);
+    let properties = settings.checker.getAugmentedPropertiesOfType(type);
     for (let i = 0; i < properties.length; i++) {
         let property = properties[i];
 
@@ -76,39 +76,39 @@ export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeC
         property.getJsDocTags().forEach((e) => e.name.startsWith("v-") && (jsDocProps[e.name.substring(2)] = e.text ?? ""));
 
         // Thx! https://stackoverflow.com/questions/61933695/typescript-compiler-api-get-get-type-of-mapped-property
-        let propType = checker.getTypeOfSymbolAtLocation(property, property.declarations?.[0] ?? type.symbol.declarations![0]);
-        let sch = createSchemaForType(propType, checker, otherTypes, jsDocProps);
+        let propType = settings.checker.getTypeOfSymbolAtLocation(property, property.declarations?.[0] ?? type.symbol.declarations![0]);
+        let sch = createSchemaForType(propType, jsDocProps, settings);
         schema.fields[property.name] = sch;
     }
 
     return !isInline ? { type: "ref", name: serializeName } : schema;
 }
 
-export function createSchemaForType(type: ts.Type, checker: ts.TypeChecker, otherTypes: RootTypes, customProps: JSDocProps = {}): TypeSchema {
+export function createSchemaForType(type: ts.Type, customProps: JSDocProps = {}, settings: TypeSchemaGeneratorSettings): TypeSchema {
     switch (type.flags) {
         case ts.TypeFlags.Object: {
-            if (checker.isTupleType(type)) {
+            if (settings.checker.isTupleType(type)) {
                 let tupleType = type as ts.TupleType;
                 return createNormalSchema(customProps, {
                     type: "tuple",
-                    itemTypes: tupleType.resolvedTypeArguments!.map((e) => createSchemaForType(e, checker, otherTypes, customProps)),
+                    itemTypes: tupleType.resolvedTypeArguments!.map((e) => createSchemaForType(e, customProps, settings)),
                 });
-            } else if (checker.isArrayType(type)) {
-                let arrType = checker.getElementTypeOfArrayType(type)!;
-                return createArraySchema(customProps, createSchemaForType(arrType, checker, otherTypes, customProps));
+            } else if (settings.checker.isArrayType(type)) {
+                let arrType = settings.checker.getElementTypeOfArrayType(type)!;
+                return createArraySchema(customProps, createSchemaForType(arrType, customProps, settings));
             } else if (
                 symbolHasFlag(type.symbol, ts.SymbolFlags.Interface) ||
                 symbolHasFlag(type.symbol, ts.SymbolFlags.TypeLiteral) ||
                 symbolHasFlag(type.symbol, ts.SymbolFlags.Class)
             ) {
-                return createNormalSchema(customProps, createSchemaForObjectType(type as ts.ObjectType, checker, otherTypes));
+                return createNormalSchema(customProps, createSchemaForObjectType(type as ts.ObjectType, settings));
             } else {
                 throw new Error(`Unsupported object type \`${symbolFlagsToString(type.symbol.flags)}\``);
             }
         }
 
         case ts.TypeFlags.Union:
-            return { type: "or", schemas: (type as ts.UnionType).types.map((e) => createSchemaForType(e, checker, otherTypes, customProps)) };
+            return { type: "or", schemas: (type as ts.UnionType).types.map((e) => createSchemaForType(e, customProps, settings)) };
         case ts.TypeFlags.String:
             return createStringSchema(customProps);
         case ts.TypeFlags.Number:
@@ -117,10 +117,10 @@ export function createSchemaForType(type: ts.Type, checker: ts.TypeChecker, othe
         case ts.TypeFlags.Boolean:
             return createNormalSchema(customProps, { type: "boolean" });
         case ts.TypeFlags.Never:
-            console.warn(`A never type was found, this will always validate to false. \`${checker.typeToString(type)}\``);
+            console.warn(`A never type was found, this will always validate to false. \`${settings.checker.typeToString(type)}\``);
             return createNormalSchema(customProps, { type: "never" });
         case ts.TypeFlags.Any:
-            console.warn(`An any type was found, this will always validate to true. \`${checker.typeToString(type)}\``);
+            console.warn(`An any type was found, this will always validate to true. \`${settings.checker.typeToString(type)}\``);
             return createNormalSchema(customProps, { type: "any" });
         case ts.TypeFlags.NumberLiteral:
             return createNormalSchema(customProps, { type: "numberLiteral", value: (type as ts.NumberLiteralType).value });
@@ -146,13 +146,9 @@ export function createSchemaForType(type: ts.Type, checker: ts.TypeChecker, othe
     }
 }
 
-export function createSchemaForTypeDeclaration(
-    e: ts.InterfaceDeclaration | ts.ClassDeclaration | ts.TypeAliasDeclaration,
-    checker: ts.TypeChecker,
-    output: RootTypes
-): TypeRefSchema {
+export function createSchemaForTypeDeclaration(e: ts.InterfaceDeclaration | ts.ClassDeclaration | ts.TypeAliasDeclaration, settings: TypeSchemaGeneratorSettings): TypeRefSchema {
     if ((ts.isInterfaceDeclaration(e) || ts.isClassDeclaration(e) || ts.isTypeAliasDeclaration(e)) && e.name) {
-        return createSchemaForType(checker.getTypeAtLocation(e), checker, output) as TypeRefSchema;
+        return createSchemaForType(settings.checker.getTypeAtLocation(e), undefined, settings) as TypeRefSchema;
     } else {
         throw new Error(`Unsupported declaration type \`${ts.NodeFlags[e.flags]}\``);
     }
