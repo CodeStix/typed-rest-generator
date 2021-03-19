@@ -1,5 +1,5 @@
 import ts from "byots";
-import { symbolHasFlag, symbolFlagsToString, typeFlagsToString, getSymbolUsageName, getFullTypeName, isDefaultType } from "./helpers";
+import { symbolHasFlag, symbolFlagsToString, typeFlagsToString, getSymbolUsageName, getFullTypeName, isDefaultType, parseBoolean } from "./helpers";
 
 export type JSDocProps = {
     [prop: string]: string;
@@ -187,17 +187,11 @@ function createStringSchema(customProps: JSDocProps): StringTypeSchema {
                 schema.regexMessage = args.slice(1).join(" ") || undefined;
                 break;
             default:
-                throw new Error(`string does not support validator \`@v-${prop}\``);
+                console.warn(`string does not support validator \`@v-${prop}\`, ignoring...`);
+                break;
         }
     });
     return schema;
-}
-
-function parseBoolean(str: string) {
-    str = str.trim();
-    if (str === "true") return true;
-    else if (str === "false") return false;
-    else throw new Error("Invalid boolean, please use `true` or `false`.");
 }
 
 function createNumberSchema(customProps: JSDocProps): NumberTypeSchema {
@@ -218,7 +212,8 @@ function createNumberSchema(customProps: JSDocProps): NumberTypeSchema {
                 schema.integerMessage = args.slice(1).join(" ") || undefined;
                 break;
             default:
-                throw new Error(`number does not support validator \`@v-${prop}\``);
+                console.warn(`number does not support validator \`@v-${prop}\`, ignoring...`);
+                break;
         }
     });
     return schema;
@@ -238,7 +233,8 @@ function createArraySchema(customProps: JSDocProps, itemType: TypeSchema): Array
                 schema.maxMessage = args.slice(1).join(" ") || undefined;
                 break;
             default:
-                throw new Error(`array does not support validator \`@v-${prop}\``);
+                console.warn(`array does not support validator \`@v-${prop}\`, ignoring...`);
+                break;
         }
     });
     return schema;
@@ -246,7 +242,7 @@ function createArraySchema(customProps: JSDocProps, itemType: TypeSchema): Array
 
 function createNormalSchema(customProps: JSDocProps, schema: TypeSchema): TypeSchema {
     let keys = Object.keys(customProps);
-    if (keys.length !== 0) throw new Error(`${schema.type} does not support validator \`@v-${keys[0]}\``);
+    if (keys.length !== 0) console.warn(`${schema.type} does not support validator \`@v-${keys[0]}\`, ignoring...`);
     return schema;
 }
 

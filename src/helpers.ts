@@ -15,6 +15,13 @@ export function isUpperCase(str: string, at: number) {
     return c >= 65 && c <= 90;
 }
 
+export function parseBoolean(str: string) {
+    str = str.trim();
+    if (str === "true") return true;
+    else if (str === "false") return false;
+    else throw new Error("Invalid boolean, please use `true` or `false`.");
+}
+
 /**
  * UserPost -> ["User","Post"]
  */
