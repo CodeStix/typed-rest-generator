@@ -69,6 +69,7 @@ export namespace Routes {
     export interface UserGetRequest {
         /**
          * @v-min 0 Must be larger than 0
+         * @v-int false
          */
         userId: number;
     }

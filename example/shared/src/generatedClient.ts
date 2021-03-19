@@ -67,12 +67,13 @@ declare module "express-serve-static-core" {
 export type Types = {
     [name: string]: TypeSchema;
 };
-export type NumberTypeSchema = { type: "number"; min?: number; max?: number; minMessage?: string; maxMessage?: string };
+export type NumberTypeSchema = { type: "number"; min?: number; max?: number; minMessage?: string; maxMessage?: string; integer?: boolean; integerMessage?: string };
 export type StringTypeSchema = { type: "string"; min?: number; max?: number; regex?: string; minMessage?: string; maxMessage?: string; regexMessage?: string };
 export type ArrayTypeSchema = { type: "array"; itemType: TypeSchema; min?: number; max?: number; minMessage?: string; maxMessage?: string };
+export type TypeRefSchema = { type: "ref"; name: string };
 export type TypeSchema =
     | { type: "or"; schemas: readonly TypeSchema[] }
-    | { type: "ref"; name: string }
+    | TypeRefSchema
     | { type: "objectLiteral"; fields: Types }
     | ArrayTypeSchema
     | { type: "tuple"; itemTypes: readonly TypeSchema[] }
@@ -100,6 +101,7 @@ export interface ValidationSettings {
     abortEarly?: boolean;
     defaultMaxStringLength?: number;
     unknownKeyMode?: "delete" | "error";
+    defaultNumberMode?: "integer" | "float";
 }
 
 export function validate<T extends any, Error extends string = string>(
@@ -114,9 +116,11 @@ export function validate<T extends any, Error extends string = string>(
         case "any":
             return [null, value];
         case "number":
-            if (typeof value !== "number") return ["must be of type `number`" as any, undefined];
+            if (typeof value !== "number" || isNaN(value)) return ["must be of type `number`" as any, undefined];
             if (schema.min && value < schema.min) return [(schema.minMessage ?? "must be higher") as any, undefined];
             if (schema.max && value > schema.max) return [(schema.maxMessage ?? "must be lower") as any, undefined];
+            if (!Number.isInteger(value) && (schema.integer ?? (!settings.defaultNumberMode || settings.defaultNumberMode === "integer")))
+                return [schema.integerMessage ?? ("must be integer" as any), undefined];
             return [null, value];
         case "string":
             if (typeof value !== "string") return ["must be of type `string`" as any, undefined];
@@ -300,7 +304,7 @@ export type Endpoints = {
 
 
 
-const VERSION = "1.1.1";
+const VERSION = "1.1.2";
 
 export class Client extends BaseClient<Endpoints> {
     
@@ -468,7 +472,8 @@ const SCHEMAS = {
             "userId": {
                 "type": "number",
                 "min": 0,
-                "minMessage": "Must be larger than 0"
+                "minMessage": "Must be larger than 0",
+                "integer": false
             }
         }
     },

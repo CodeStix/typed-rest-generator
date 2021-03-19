@@ -10,6 +10,7 @@ export interface ValidationSettings {
     abortEarly?: boolean;
     defaultMaxStringLength?: number;
     unknownKeyMode?: "delete" | "error";
+    defaultNumberMode?: "integer" | "float";
 }
 
 export function validate<T extends any, Error extends string = string>(
@@ -24,9 +25,11 @@ export function validate<T extends any, Error extends string = string>(
         case "any":
             return [null, value];
         case "number":
-            if (typeof value !== "number") return ["must be of type `number`" as any, undefined];
+            if (typeof value !== "number" || isNaN(value)) return ["must be of type `number`" as any, undefined];
             if (schema.min && value < schema.min) return [(schema.minMessage ?? "must be higher") as any, undefined];
             if (schema.max && value > schema.max) return [(schema.maxMessage ?? "must be lower") as any, undefined];
+            if (!Number.isInteger(value) && (schema.integer ?? (!settings.defaultNumberMode || settings.defaultNumberMode === "integer")))
+                return [schema.integerMessage ?? ("must be integer" as any), undefined];
             return [null, value];
         case "string":
             if (typeof value !== "string") return ["must be of type `string`" as any, undefined];

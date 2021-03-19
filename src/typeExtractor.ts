@@ -13,7 +13,7 @@ export type RootTypes = {
         schema: TypeSchema;
     };
 };
-export type NumberTypeSchema = { type: "number"; min?: number; max?: number; minMessage?: string; maxMessage?: string };
+export type NumberTypeSchema = { type: "number"; min?: number; max?: number; minMessage?: string; maxMessage?: string; integer?: boolean; integerMessage?: string };
 export type StringTypeSchema = { type: "string"; min?: number; max?: number; regex?: string; minMessage?: string; maxMessage?: string; regexMessage?: string };
 export type ArrayTypeSchema = { type: "array"; itemType: TypeSchema; min?: number; max?: number; minMessage?: string; maxMessage?: string };
 export type TypeRefSchema = { type: "ref"; name: string };
@@ -193,6 +193,13 @@ function createStringSchema(customProps: JSDocProps): StringTypeSchema {
     return schema;
 }
 
+function parseBoolean(str: string) {
+    str = str.trim();
+    if (str === "true") return true;
+    else if (str === "false") return false;
+    else throw new Error("Invalid boolean, please use `true` or `false`.");
+}
+
 function createNumberSchema(customProps: JSDocProps): NumberTypeSchema {
     let schema: NumberTypeSchema = { type: "number" };
     Object.keys(customProps).forEach((prop) => {
@@ -206,6 +213,10 @@ function createNumberSchema(customProps: JSDocProps): NumberTypeSchema {
                 schema.max = parseInt(args[0]);
                 schema.maxMessage = args.slice(1).join(" ") || undefined;
                 break;
+            case "int":
+                schema.integer = parseBoolean(args[0]);
+                schema.integerMessage = args.slice(1).join(" ") || undefined;
+                break;
             default:
                 throw new Error(`number does not support validator \`@v-${prop}\``);
         }
@@ -218,11 +229,11 @@ function createArraySchema(customProps: JSDocProps, itemType: TypeSchema): Array
     Object.keys(customProps).forEach((prop) => {
         let args = customProps[prop].split(" ");
         switch (prop) {
-            case "min":
+            case "array-min":
                 schema.min = parseInt(args[0]);
                 schema.minMessage = args.slice(1).join(" ") || undefined;
                 break;
-            case "max":
+            case "array-max":
                 schema.max = parseInt(args[0]);
                 schema.maxMessage = args.slice(1).join(" ") || undefined;
                 break;
