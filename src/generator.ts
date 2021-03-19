@@ -1,19 +1,7 @@
 import ts from "byots";
 import fs from "fs";
 import path from "path";
-import { typeFlagsToString } from "../dist/helpers";
-import {
-    decapitalize,
-    splitCapitalized,
-    getSymbolUsageName,
-    getMostSuitableDeclaration,
-    getSymbolFullName,
-    getSymbolImportName,
-    isDefaultType,
-    getFullTypeName,
-    capitalize,
-    nodeFlagsToString,
-} from "./helpers";
+import { decapitalize, splitCapitalized, getMostSuitableDeclaration, getSymbolImportName, isDefaultType, getFullTypeName, capitalize } from "./helpers";
 import { createSchemaForTypeDeclaration, TypeSchema, RootTypes, rootTypesToTypes } from "./typeExtractor";
 
 export type PathTypes = {

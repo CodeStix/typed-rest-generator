@@ -36,8 +36,6 @@ export type TypeSchema =
     | { type: "stringLiteral"; value: string }
     | { type: "booleanLiteral"; value: boolean };
 
-export const SKIP_TYPES = ["Date", "Decimal", "Function"];
-
 export function createSchemaForObjectType(type: ts.ObjectType, checker: ts.TypeChecker, otherTypes: RootTypes): TypeSchema {
     let fullName = getFullTypeName(type, checker);
     let sym = type.aliasSymbol ?? type.symbol;

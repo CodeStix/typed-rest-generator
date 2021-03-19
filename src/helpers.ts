@@ -15,8 +15,9 @@ export function isUpperCase(str: string, at: number) {
     return c >= 65 && c <= 90;
 }
 
-// UserPost -> ["User","Post"]
-// UserPostSettingsAAAAaaa -> ["User", "Post", "Settings", "AAAAaaa"]
+/**
+ * UserPost -> ["User","Post"]
+ */
 export function splitCapitalized(str: string) {
     let parts: string[] = [];
     let current = "";
@@ -50,7 +51,7 @@ export function getSymbolUsageName(symbol: ts.Symbol): string {
 
 export function getSymbolFullName(symbol: ts.Symbol): string {
     if (!symbol.parent?.parent) return symbol.name;
-    return getSymbolUsageName(symbol.parent) + symbol.name;
+    return getSymbolFullName(symbol.parent) + symbol.name;
 }
 
 export function getMostSuitableDeclaration(decls?: ts.Declaration[]) {
@@ -58,6 +59,9 @@ export function getMostSuitableDeclaration(decls?: ts.Declaration[]) {
     return decls.find((e) => ts.isClassDeclaration(e) || ts.isFunctionDeclaration(e) || ts.isInterfaceDeclaration(e) || ts.isTypeAliasDeclaration(e) || ts.isImportSpecifier(e))!;
 }
 
+/**
+ * Returns true if the given type/symbol is located in the typescript/lib folder
+ */
 export function isDefaultType(symbol: ts.Symbol) {
     return symbol.declarations!.some((e) => e.getSourceFile().fileName.includes("/node_modules/typescript/lib"));
 }
