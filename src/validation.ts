@@ -75,7 +75,7 @@ export function validate<T extends any, Error extends string = string>(
                 copy[i] = val;
                 if (res !== null) {
                     err[i as keyof T] = res as any;
-                    if (settings.abortEarly) return [err as any, undefined];
+                    if (settings.abortEarly ?? true) return [err as any, undefined];
                 }
             }
             return Object.keys(err).length > 0 ? [err as any, undefined] : [null, copy as any];
@@ -92,7 +92,7 @@ export function validate<T extends any, Error extends string = string>(
                 copy[key] = val;
                 if (res !== null) {
                     err[key as keyof T] = res as any;
-                    if (settings.abortEarly) return [err as any, undefined];
+                    if (settings.abortEarly ?? true) return [err as any, undefined];
                 }
             }
             return Object.keys(err).length > 0 ? [err as any, undefined] : [null, copy];
@@ -106,7 +106,7 @@ export function validate<T extends any, Error extends string = string>(
                 copy[i] = val;
                 if (res !== null) {
                     err[i as keyof T] = res as any;
-                    if (settings.abortEarly) return [err as any, undefined];
+                    if (settings.abortEarly ?? true) return [err as any, undefined];
                 }
             }
             return Object.keys(err).length > 0 ? [err as any, undefined] : [null, copy as any];
