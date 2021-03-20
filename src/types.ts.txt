@@ -153,7 +153,7 @@ export function validate<T extends any, Error extends string = string>(
             }
             let objError = err.find((e) => typeof e === "object");
             if (objError) return [objError as any, undefined];
-            return [(err.join(", ") || "invalid or") as any, undefined];
+            return [err[err.length - 1] || ("invalid or" as any), undefined];
         }
         case "array": {
             if (!Array.isArray(value)) return ["invalid array" as any, undefined];
