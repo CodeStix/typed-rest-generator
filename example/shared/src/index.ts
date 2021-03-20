@@ -109,6 +109,7 @@ export namespace Routes {
         /**
          * @v-min 0 Must be larger than 0
          * @v-int false
+         * @v-type Must be number
          */
         userId: number;
     }

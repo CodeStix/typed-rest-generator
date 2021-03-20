@@ -25,14 +25,14 @@ export function validate<T extends any, Error extends string = string>(
         case "any":
             return [null, value];
         case "number":
-            if (typeof value !== "number" || isNaN(value)) return ["must be of type `number`" as any, undefined];
+            if (typeof value !== "number" || isNaN(value)) return [(schema.typeMessage ?? "must be of type `number`") as any, undefined];
             if (schema.min && value < schema.min) return [(schema.minMessage ?? "must be higher") as any, undefined];
             if (schema.max && value > schema.max) return [(schema.maxMessage ?? "must be lower") as any, undefined];
             if (!Number.isInteger(value) && (schema.integer ?? (!settings.defaultNumberMode || settings.defaultNumberMode === "integer")))
-                return [schema.integerMessage ?? ("must be integer" as any), undefined];
+                return [(schema.integerMessage ?? "must be integer") as any, undefined];
             return [null, value];
         case "string":
-            if (typeof value !== "string") return ["must be of type `string`" as any, undefined];
+            if (typeof value !== "string") return [(schema.typeMessage ?? "must be of type `string`") as any, undefined];
             if (schema.min && value.length < schema.min) return [(schema.minMessage ?? "must be longer") as any, undefined];
             let max = schema.max ?? settings.defaultMaxStringLength;
             if (max && value.length > max) return [(schema.maxMessage ?? "must be shorter") as any, undefined];
@@ -41,9 +41,9 @@ export function validate<T extends any, Error extends string = string>(
         case "boolean":
         case "object":
         case "undefined":
-            return typeof value === schema.type ? [null, value] : [`must be of type \`${schema.type}\`` as any, undefined];
+            return typeof value === schema.type ? [null, value] : [(schema.typeMessage ?? `must be of type \`${schema.type}\``) as any, undefined];
         case "null":
-            return value === null ? [null, value] : ["must be `null`" as any, undefined];
+            return value === null ? [null, value] : [(schema.typeMessage ?? "must be `null`") as any, undefined];
         case "ref":
             let sch = settings.otherTypes?.[schema.name];
             if (!sch) throw new Error(`Schema for type \`${schema.name}\` was not found.`);
@@ -51,7 +51,7 @@ export function validate<T extends any, Error extends string = string>(
         case "stringLiteral":
         case "booleanLiteral":
         case "numberLiteral":
-            return value === schema.value ? [null, value] : [`must have value \`${schema.value}\`` as any, undefined];
+            return value === schema.value ? [null, value] : [(schema.message ?? `must have value \`${schema.value}\``) as any, undefined];
         case "or": {
             let err = [];
             for (let i = 0; i < schema.schemas.length; i++) {
@@ -115,9 +115,9 @@ export function validate<T extends any, Error extends string = string>(
             if (value instanceof Date) return [null, value];
             if (typeof value === "string" || typeof value === "number") {
                 let date = new Date(value);
-                return isNaN(date.getTime()) ? ["invalid date" as any, undefined] : [null, date as T];
+                return isNaN(date.getTime()) ? [(schema.typeMessage ?? "invalid date") as any, undefined] : [null, date as T];
             } else {
-                return ["invalid date" as any, undefined];
+                return [(schema.typeMessage ?? "invalid date") as any, undefined];
             }
         }
     }

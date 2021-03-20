@@ -153,7 +153,7 @@ export function validate<T extends any, Error extends string = string>(
             }
             let objError = err.find((e) => typeof e === "object");
             if (objError) return [objError as any, undefined];
-            return [(err.join(", ") || "invalid or") as any, undefined];
+            return [err[err.length - 1] || ("invalid or" as any), undefined];
         }
         case "array": {
             if (!Array.isArray(value)) return ["invalid array" as any, undefined];
@@ -166,7 +166,7 @@ export function validate<T extends any, Error extends string = string>(
                 copy[i] = val;
                 if (res !== null) {
                     err[i as keyof T] = res as any;
-                    if (settings.abortEarly) return [err as any, undefined];
+                    if (settings.abortEarly ?? true) return [err as any, undefined];
                 }
             }
             return Object.keys(err).length > 0 ? [err as any, undefined] : [null, copy as any];
@@ -183,7 +183,7 @@ export function validate<T extends any, Error extends string = string>(
                 copy[key] = val;
                 if (res !== null) {
                     err[key as keyof T] = res as any;
-                    if (settings.abortEarly) return [err as any, undefined];
+                    if (settings.abortEarly ?? true) return [err as any, undefined];
                 }
             }
             return Object.keys(err).length > 0 ? [err as any, undefined] : [null, copy];
@@ -197,7 +197,7 @@ export function validate<T extends any, Error extends string = string>(
                 copy[i] = val;
                 if (res !== null) {
                     err[i as keyof T] = res as any;
-                    if (settings.abortEarly) return [err as any, undefined];
+                    if (settings.abortEarly ?? true) return [err as any, undefined];
                 }
             }
             return Object.keys(err).length > 0 ? [err as any, undefined] : [null, copy as any];
@@ -213,6 +213,7 @@ export function validate<T extends any, Error extends string = string>(
         }
     }
 }
+
 
 
 /* ---- Client-side ---- */
@@ -308,7 +309,7 @@ export type Endpoints = {
 
 
 
-const VERSION = "1.1.4";
+const VERSION = "1.1.7";
 
 export class Client extends BaseClient<Endpoints> {
     
@@ -647,7 +648,8 @@ const SCHEMAS = {
                 "type": "number",
                 "min": 0,
                 "minMessage": "Must be larger than 0",
-                "integer": false
+                "integer": false,
+                "typeMessage": "Must be number"
             }
         }
     },

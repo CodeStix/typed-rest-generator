@@ -13,9 +13,31 @@ export type RootTypes = {
         schema: TypeSchema;
     };
 };
-export type NumberTypeSchema = { type: "number"; min?: number; max?: number; minMessage?: string; maxMessage?: string; integer?: boolean; integerMessage?: string };
-export type StringTypeSchema = { type: "string"; min?: number; max?: number; regex?: string; minMessage?: string; maxMessage?: string; regexMessage?: string };
+export type NumberTypeSchema = {
+    type: "number";
+    min?: number;
+    max?: number;
+    minMessage?: string;
+    maxMessage?: string;
+    integer?: boolean;
+    integerMessage?: string;
+    typeMessage?: string;
+};
+export type StringTypeSchema = {
+    type: "string";
+    min?: number;
+    max?: number;
+    regex?: string;
+    minMessage?: string;
+    maxMessage?: string;
+    regexMessage?: string;
+    typeMessage?: string;
+};
 export type ArrayTypeSchema = { type: "array"; itemType: TypeSchema; min?: number; max?: number; minMessage?: string; maxMessage?: string };
+export type TypeTypeSchema =
+    | { type: "boolean" | "object" | "never" | "date" | "unknown" | "any" | "null" | "undefined"; typeMessage?: string }
+    | StringTypeSchema
+    | NumberTypeSchema;
 export type TypeRefSchema = { type: "ref"; name: string };
 export type TypeSchema =
     | { type: "or"; schemas: readonly TypeSchema[] }
@@ -23,19 +45,10 @@ export type TypeSchema =
     | { type: "objectLiteral"; fields: Types }
     | ArrayTypeSchema
     | { type: "tuple"; itemTypes: readonly TypeSchema[] }
-    | { type: "undefined" }
-    | { type: "null" }
-    | StringTypeSchema
-    | { type: "boolean" }
-    | { type: "object" }
-    | { type: "never" }
-    | { type: "date" }
-    | { type: "unknown" }
-    | { type: "any" }
-    | NumberTypeSchema
-    | { type: "numberLiteral"; value: number }
-    | { type: "stringLiteral"; value: string }
-    | { type: "booleanLiteral"; value: boolean };
+    | TypeTypeSchema
+    | { type: "numberLiteral"; value: number; message?: string }
+    | { type: "stringLiteral"; value: string; message?: string }
+    | { type: "booleanLiteral"; value: boolean; message?: string };
 
 export interface TypeSchemaGeneratorSettings {
     checker: ts.TypeChecker;
@@ -103,10 +116,10 @@ export function createSchemaForType(type: ts.Type, customProps: JSDocProps = {},
         case ts.TypeFlags.Object: {
             if (settings.checker.isTupleType(type)) {
                 let tupleType = type as ts.TupleType;
-                return createNormalSchema(customProps, {
+                return {
                     type: "tuple",
                     itemTypes: tupleType.resolvedTypeArguments!.map((e) => createSchemaForType(e, customProps, settings)),
-                });
+                };
             } else if (settings.checker.isArrayType(type)) {
                 let arrType = settings.checker.getElementTypeOfArrayType(type)!;
                 return createArraySchema(customProps, createSchemaForType(arrType, customProps, settings));
@@ -115,7 +128,7 @@ export function createSchemaForType(type: ts.Type, customProps: JSDocProps = {},
                 symbolHasFlag(type.symbol, ts.SymbolFlags.TypeLiteral) ||
                 symbolHasFlag(type.symbol, ts.SymbolFlags.Class)
             ) {
-                return createNormalSchema(customProps, createSchemaForObjectType(type as ts.ObjectType, settings));
+                return createSchemaForObjectType(type as ts.ObjectType, settings);
             } else {
                 throw new Error(`Unsupported object type \`${symbolFlagsToString(type.symbol.flags)}\``);
             }
@@ -124,32 +137,32 @@ export function createSchemaForType(type: ts.Type, customProps: JSDocProps = {},
         case ts.TypeFlags.Union:
             return { type: "or", schemas: (type as ts.UnionType).types.map((e) => createSchemaForType(e, customProps, settings)) };
         case ts.TypeFlags.String:
-            return createStringSchema(customProps);
+            return createTypeTypeSchema(customProps, createStringSchema(customProps));
         case ts.TypeFlags.Number:
-            return createNumberSchema(customProps);
+            return createTypeTypeSchema(customProps, createNumberSchema(customProps));
         case ts.TypeFlags.Union | ts.TypeFlags.Boolean:
         case ts.TypeFlags.Boolean:
-            return createNormalSchema(customProps, { type: "boolean" });
+            return createTypeTypeSchema(customProps, { type: "boolean" });
         case ts.TypeFlags.Never:
             console.warn(`A never type was found, this will always validate to false. \`${settings.checker.typeToString(type)}\``);
-            return createNormalSchema(customProps, { type: "never" });
+            return createTypeTypeSchema(customProps, { type: "never" });
         case ts.TypeFlags.Any:
             console.warn(`An any type was found, this will always validate to true. \`${settings.checker.typeToString(type)}\``);
-            return createNormalSchema(customProps, { type: "any" });
+            return createTypeTypeSchema(customProps, { type: "any" });
         case ts.TypeFlags.NumberLiteral:
-            return createNormalSchema(customProps, { type: "numberLiteral", value: (type as ts.NumberLiteralType).value });
+            return { type: "numberLiteral", value: (type as ts.NumberLiteralType).value };
         case ts.TypeFlags.StringLiteral:
-            return createNormalSchema(customProps, { type: "stringLiteral", value: (type as ts.StringLiteralType).value });
+            return { type: "stringLiteral", value: (type as ts.StringLiteralType).value };
         case ts.TypeFlags.BooleanLiteral:
-            return createNormalSchema(customProps, { type: "booleanLiteral", value: type.id === 17 }); // Better way?
+            return { type: "booleanLiteral", value: type.id === 17 }; // Better way?
         case ts.TypeFlags.Undefined:
-            return createNormalSchema(customProps, { type: "undefined" });
+            return createTypeTypeSchema(customProps, { type: "undefined" });
         case ts.TypeFlags.Null:
-            return createNormalSchema(customProps, { type: "null" });
+            return createTypeTypeSchema(customProps, { type: "null" });
         case ts.TypeFlags.Unknown:
-            return createNormalSchema(customProps, { type: "unknown" });
+            return createTypeTypeSchema(customProps, { type: "unknown" });
         case ts.TypeFlags.NonPrimitive:
-            return createNormalSchema(customProps, { type: "object" });
+            return createTypeTypeSchema(customProps, { type: "object" });
 
         case ts.TypeFlags.TypeParameter:
             throw new Error(`The type of generic \`${(type as ts.TypeParameter).symbol.name}\` must be known at build time.`);
@@ -187,7 +200,7 @@ function createStringSchema(customProps: JSDocProps): StringTypeSchema {
                 schema.regexMessage = args.slice(1).join(" ") || undefined;
                 break;
             default:
-                console.warn(`string does not support validator \`@v-${prop}\`, ignoring...`);
+                console.warn(`String does not support validator \`@v-${prop}\`, ignoring...`);
                 break;
         }
     });
@@ -212,7 +225,7 @@ function createNumberSchema(customProps: JSDocProps): NumberTypeSchema {
                 schema.integerMessage = args.slice(1).join(" ") || undefined;
                 break;
             default:
-                console.warn(`number does not support validator \`@v-${prop}\`, ignoring...`);
+                console.warn(`Number does not support validator \`@v-${prop}\`, ignoring...`);
                 break;
         }
     });
@@ -233,16 +246,25 @@ function createArraySchema(customProps: JSDocProps, itemType: TypeSchema): Array
                 schema.maxMessage = args.slice(1).join(" ") || undefined;
                 break;
             default:
-                console.warn(`array does not support validator \`@v-${prop}\`, ignoring...`);
+                console.warn(`Array does not support validator \`@v-${prop}\`, ignoring...`);
                 break;
         }
     });
     return schema;
 }
 
-function createNormalSchema(customProps: JSDocProps, schema: TypeSchema): TypeSchema {
-    let keys = Object.keys(customProps);
-    if (keys.length !== 0) console.warn(`${schema.type} does not support validator \`@v-${keys[0]}\`, ignoring...`);
+function createTypeTypeSchema(customProps: JSDocProps, schema: TypeTypeSchema): TypeTypeSchema {
+    Object.keys(customProps).forEach((prop) => {
+        let args = customProps[prop].split(" ");
+        switch (prop) {
+            case "type":
+                schema.typeMessage = args.join(" ") || undefined;
+                break;
+            default:
+                console.warn(`Type constraint does not support validator \`@v-${prop}\`, ignoring...`);
+                break;
+        }
+    });
     return schema;
 }
 
