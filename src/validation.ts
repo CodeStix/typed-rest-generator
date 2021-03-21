@@ -89,7 +89,8 @@ export function validate<T extends any, Error extends string = string>(
             for (let i = 0; i < keys.length; i++) {
                 let key = keys[i];
                 let [res, val] = validate(schema.fields[key], (value as any)[key], settings);
-                copy[key] = val;
+                if (val !== undefined) copy[key] = val;
+                else delete copy[key];
                 if (res !== null) {
                     err[key as keyof T] = res as any;
                     if (settings.abortEarly ?? true) return [err as any, undefined];
